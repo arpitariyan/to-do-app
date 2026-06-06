@@ -94,10 +94,10 @@ function TabItem({
       activeOpacity={0.8}
     >
       <Animated.View style={[styles.pillContainer, pillAnimatedStyle]}>
-        <Ionicons 
-          name={getIconName()} 
-          size={20} 
-          color={isFocused ? activeTextColor : colors.textMuted} 
+        <Ionicons
+          name={getIconName()}
+          size={20}
+          color={isFocused ? activeTextColor : colors.textMuted}
         />
         <Animated.View style={[textAnimatedStyle, { height: 20, justifyContent: 'center' }]}>
           <Text
@@ -116,6 +116,17 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const currentRoute = state.routes[state.index];
+  const isTabBarHidden = 
+    currentRoute.name === 'tasks/new' ||
+    currentRoute.name === 'tasks/[id]' ||
+    currentRoute.name === 'notes/new' ||
+    currentRoute.name === 'notes/[id]';
+
+  if (isTabBarHidden) {
+    return null;
+  }
+
   return (
     <View
       style={[
@@ -130,7 +141,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       {state.routes.map((route, index) => {
         const options = descriptors[route.key].options as any;
 
-        const isHidden = 
+        const isHidden =
           options.href === null ||
           route.name === 'tasks/new' ||
           route.name === 'tasks/[id]' ||

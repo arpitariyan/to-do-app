@@ -1,5 +1,6 @@
 import { databases, DB_ID, COLLECTIONS, ID, Query } from '../appwrite';
 import { useAuthStore } from '../../stores/authStore';
+import { isBefore, startOfDay, startOfWeek, startOfMonth, addDays, addWeeks, addMonths } from 'date-fns';
 
 export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'archived' | 'delayed' | 'cancelled';
@@ -98,7 +99,63 @@ export async function getTasks(filters?: { status?: TaskStatus; archived?: boole
     queries
   );
 
-  return response.documents as unknown as Task[];
+  let tasks = response.documents as unknown as Task[];
+  
+  // Background Recurrence Reset Engine
+  let needsRefetch = false;
+  const now = new Date();
+  
+  for (const task of tasks) {
+    if (task.status === 'done' && task.repeatType && task.repeatType !== 'none') {
+      const updatedDate = new Date(task.updatedAt);
+      let shouldReset = false;
+      let nextDueAt: Date | undefined = task.dueAt ? new Date(task.dueAt) : undefined;
+
+      if (task.repeatType === 'daily') {
+        if (isBefore(updatedDate, startOfDay(now))) {
+          shouldReset = true;
+          if (nextDueAt) nextDueAt = addDays(nextDueAt, 1);
+        }
+      } else if (task.repeatType === 'weekly') {
+        if (isBefore(updatedDate, startOfWeek(now, { weekStartsOn: 1 }))) {
+          shouldReset = true;
+          if (nextDueAt) nextDueAt = addWeeks(nextDueAt, 1);
+        }
+      } else if (task.repeatType === 'monthly') {
+        if (isBefore(updatedDate, startOfMonth(now))) {
+          shouldReset = true;
+          if (nextDueAt) nextDueAt = addMonths(nextDueAt, 1);
+        }
+      }
+
+      if (shouldReset) {
+        // Roll forward until it's in the future if it's very old
+        if (nextDueAt && isBefore(nextDueAt, startOfDay(now))) {
+           if (task.repeatType === 'daily') {
+             nextDueAt.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+           }
+        }
+
+        try {
+          await updateTask(task.$id, {
+            status: 'todo',
+            dueAt: nextDueAt ? nextDueAt.toISOString() : undefined,
+          });
+          needsRefetch = true;
+        } catch (e) {
+          console.error('Failed to reset recurring task:', e);
+        }
+      }
+    }
+  }
+
+  // If we automatically updated tasks, fetch the fresh list so the UI is accurate
+  if (needsRefetch) {
+    const refreshed = await databases.listDocuments(DB_ID, COLLECTIONS.TASKS, queries);
+    tasks = refreshed.documents as unknown as Task[];
+  }
+
+  return tasks;
 }
 
 /**

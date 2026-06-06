@@ -1,7 +1,7 @@
 import { Client, Account, Databases, Storage, ID, Query } from 'react-native-appwrite';
 
-const ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT ?? 'https://sgp.cloud.appwrite.io/v1';
-const PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID ?? '';
+export const ENDPOINT = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT ?? 'https://sgp.cloud.appwrite.io/v1';
+export const PROJECT_ID = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID ?? '';
 
 if (!PROJECT_ID) {
   console.warn('[Appwrite] EXPO_PUBLIC_APPWRITE_PROJECT_ID is not set. Authentication will fail.');

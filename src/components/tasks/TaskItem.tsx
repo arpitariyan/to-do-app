@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { format, isPast, isToday, isTomorrow } from 'date-fns';
+import { format, isPast, isToday, isTomorrow, startOfDay } from 'date-fns';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, radii } from '../../theme/tokens';
 import { textStyles } from '../../theme/typography';
@@ -86,8 +86,14 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
           {task.title}
         </Text>
         
+        {task.description && (
+          <Text style={[textStyles.bodySm, { color: colors.textMuted, marginTop: 4 }]} numberOfLines={1}>
+            {task.description}
+          </Text>
+        )}
+
         {/* Metadata Row */}
-        {(task.description || task.dueAt || totalSubtasks > 0 || (task.tags && task.tags.length > 0) || task.taskType === 'recurring') && (
+        {(task.description || task.dueAt || totalSubtasks > 0 || (task.tags && task.tags.length > 0) || task.repeatType || (task.attachments && task.attachments.length > 0)) && (
           <View style={styles.metaRow}>
             {task.dueAt && (
               <View style={styles.metaItem}>
@@ -106,9 +112,18 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
               </View>
             )}
 
-            {task.taskType === 'recurring' && (
+            {task.repeatType && task.repeatType !== 'none' && (
               <View style={styles.metaItem}>
                 <Ionicons name="repeat" size={12} color={colors.accent} />
+                <Text style={[textStyles.caption, { color: colors.accent, textTransform: 'capitalize' }]}>
+                  {task.repeatType}
+                </Text>
+              </View>
+            )}
+
+            {task.reminders && task.reminders.length > 0 && (
+              <View style={styles.metaItem}>
+                <Ionicons name="notifications" size={12} color={colors.warning} />
               </View>
             )}
             
@@ -130,6 +145,13 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
             {task.notes && (
               <View style={styles.metaItem}>
                 <Ionicons name="journal-outline" size={12} color={colors.accent} />
+              </View>
+            )}
+
+            {task.attachments && task.attachments.length > 0 && (
+              <View style={styles.metaItem}>
+                <Ionicons name="attach-outline" size={12} color={colors.textMuted} />
+                <Text style={[textStyles.caption, { color: colors.textMuted }]}>{task.attachments.length}</Text>
               </View>
             )}
 

@@ -1,4 +1,4 @@
-const { Client, Databases } = require('node-appwrite');
+const { Client, Databases, Storage } = require('node-appwrite');
 require('dotenv').config();
 
 const client = new Client()
@@ -7,7 +7,9 @@ const client = new Client()
     .setKey(process.env.APPWRITE_API_KEY);
 
 const databases = new Databases(client);
+const storage = new Storage(client);
 const DB_ID = process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID || '6a23d5780028823d2638';
+const BUCKET_ID = process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || '6a23d5de00148b47dc5c';
 const COLLECTION_ID = 'tasks';
 
 async function createAttributes() {
@@ -15,6 +17,7 @@ async function createAttributes() {
 
     const attributes = [
         { type: 'string', key: 'taskType', size: 100, required: false },
+        { type: 'string', key: 'repeatType', size: 100, required: false },
         { type: 'string', key: 'tags', size: 100, required: false, array: true },
         { type: 'datetime', key: 'startTime', required: false },
         { type: 'datetime', key: 'endTime', required: false },
@@ -55,6 +58,26 @@ async function createAttributes() {
         }
     }
     console.log('Finished updating Appwrite schema!');
+
+    console.log('Setting up Appwrite Storage Bucket...');
+    try {
+        await storage.createBucket(
+            BUCKET_ID,
+            'Task Attachments',
+            ['any'], // permissions: empty implies standard rules, 'any' is open for now (or role:users)
+            false,
+            false,
+            10485760, // 10MB
+            [] // all file types allowed
+        );
+        console.log('✅ Success: Created Task Attachments bucket.');
+    } catch (error) {
+        if (error.code === 409) {
+            console.log('⚠️ Skipped: Bucket already exists.');
+        } else {
+            console.error('❌ Error creating bucket:', error.message);
+        }
+    }
 }
 
 createAttributes();

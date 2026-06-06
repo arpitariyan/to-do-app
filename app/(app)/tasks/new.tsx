@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, KeyboardAvoidingView, ActivityIndicator, Linking, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,8 +14,9 @@ import { spacing, radii } from '../../../src/theme/tokens';
 import { textStyles } from '../../../src/theme/typography';
 import { Screen } from '../../../src/components/layout/Screen';
 import { Input } from '../../../src/components/ui/Input';
-import { Button } from '../../../src/components/ui/Button';
 import { useCreateTask } from '../../../src/hooks/useTasks';
+import { scheduleTaskReminder } from '../../../src/hooks/useNotifications';
+import { useAttachments, Attachment } from '../../../src/hooks/useAttachments';
 import type { TaskPriority, TaskType, RepeatType } from '../../../src/lib/api/tasks';
 
 const taskSchema = z.object({
@@ -22,13 +24,8 @@ const taskSchema = z.object({
   description: z.string().max(4096).optional(),
   priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']),
   pinned: z.boolean(),
-  taskType: z.enum(['one_time', 'recurring', 'deadline', 'reminder_only', 'checklist']).optional(),
   repeatType: z.enum(['none', 'daily', 'weekly', 'monthly', 'custom', 'weekday']).optional(),
   durationMinutes: z.string().optional(),
-  notes: z.string().optional(),
-  location: z.string().optional(),
-  projectId: z.string().optional(),
-  categoryId: z.string().optional(),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
@@ -41,29 +38,43 @@ const priorities: { label: string; value: TaskPriority; colorKey: 'textMuted' | 
   { label: 'Urgent', value: 'urgent', colorKey: 'accent' },
 ];
 
-const taskTypes: { label: string; value: TaskType }[] = [
-  { label: 'One-Time', value: 'one_time' },
-  { label: 'Recurring', value: 'recurring' },
-  { label: 'Deadline', value: 'deadline' },
-  { label: 'Checklist', value: 'checklist' },
+const repeatTypes: { label: string; value: RepeatType }[] = [
+  { label: 'One-Time', value: 'none' },
+  { label: 'Daily', value: 'daily' },
+  { label: 'Weekly', value: 'weekly' },
+  { label: 'Monthly', value: 'monthly' },
+];
+
+const reminderPresets = [
+  { label: 'None', value: 'none' },
+  { label: 'At time', value: '0' },
+  { label: '5 min before', value: '5' },
+  { label: '15 min before', value: '15' },
+  { label: '30 min before', value: '30' },
+  { label: '1 hr before', value: '60' },
+  { label: '1 day before', value: '1440' },
 ];
 
 export default function NewTaskScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const createTask = useCreateTask();
+  const { pickDocument, uploadFile, isUploading, getFileViewUrl } = useAttachments();
 
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [dueTime, setDueTime] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
-  // Subtasks and Tags state
+  const [reminderType, setReminderType] = useState('none');
   const [subtasks, setSubtasks] = useState<{id: string, title: string, completed: boolean}[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
-  
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  
+  // Attachments
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const { control, handleSubmit, formState: { errors } } = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -72,13 +83,29 @@ export default function NewTaskScreen() {
       description: '',
       priority: 'none',
       pinned: false,
-      taskType: 'one_time',
       repeatType: 'none',
     },
   });
 
-  const onSubmit = (data: TaskFormData) => {
-    // Combine date and time
+  const handleAddAttachment = async () => {
+    try {
+      const file = await pickDocument();
+      if (file) {
+        // We upload it immediately and store the generated ID
+        const fileId = await uploadFile(file);
+        const newAttachment = { ...file, id: fileId, url: getFileViewUrl(fileId) };
+        setAttachments(prev => [...prev, newAttachment]);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error attaching file');
+    }
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
+
+  const onSubmit = async (data: TaskFormData) => {
     let finalDueAt = undefined;
     if (dueDate) {
       const combined = new Date(dueDate);
@@ -93,94 +120,67 @@ export default function NewTaskScreen() {
     createTask.mutate(
       {
         ...data,
+        taskType: data.repeatType !== 'none' ? 'recurring' : 'one_time',
         durationMinutes: data.durationMinutes ? Number(data.durationMinutes) : undefined,
         dueAt: finalDueAt,
         subtasks: subtasks.map(st => JSON.stringify(st)),
         tags: tags,
+        reminders: reminderType !== 'none' ? [reminderType] : [],
+        attachments: attachments.map(a => JSON.stringify(a)),
       },
       {
-        onSuccess: () => {
+        onSuccess: async (createdTask) => {
+          if (finalDueAt && reminderType !== 'none') {
+            const minutesToSubtract = parseInt(reminderType, 10);
+            const triggerTime = new Date(finalDueAt);
+            triggerTime.setMinutes(triggerTime.getMinutes() - minutesToSubtract);
+            
+            if (triggerTime.getTime() > Date.now()) {
+              await scheduleTaskReminder(
+                createdTask.$id,
+                createdTask.title,
+                createdTask.description || '',
+                triggerTime,
+                createdTask.repeatType as any
+              );
+            }
+          }
           router.back();
         },
       }
     );
   };
 
-  const handleAddSubtask = () => {
-    if (newSubtask.trim()) {
-      setSubtasks([...subtasks, { id: Date.now().toString(), title: newSubtask.trim(), completed: false }]);
-      setNewSubtask('');
-    }
-  };
-
-  const handleRemoveSubtask = (id: string) => {
-    setSubtasks(subtasks.filter(st => st.id !== id));
-  };
-
-  const handleAddTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag('');
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
-  };
-
-  const onChangeDate = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDueDate(selectedDate);
-  };
-
-  const onChangeTime = (event: any, selectedDate?: Date) => {
-    setShowTimePicker(false);
-    if (selectedDate) setDueTime(selectedDate);
-  };
-
   return (
     <Screen>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Text style={[textStyles.bodyMd, { color: colors.textMuted }]}>Cancel</Text>
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[textStyles.headingSm, { color: colors.textPrimary }]}>New Task</Text>
-        <TouchableOpacity 
-          onPress={handleSubmit(onSubmit)} 
-          style={styles.headerBtn}
-          disabled={createTask.isPending}
-        >
-          <Text style={[textStyles.bodyMd, { color: colors.accent, fontWeight: '600' }]}>
-            {createTask.isPending ? 'Saving...' : 'Save'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ width: 24 }} />
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           
-          {/* AI Assist Button */}
-          <TouchableOpacity style={[styles.aiAssistBtn, { backgroundColor: colors.bg2, borderColor: colors.border }]}>
-            <Ionicons name="sparkles" size={20} color={colors.accent} />
-            <Text style={[textStyles.body, { color: colors.accent, marginLeft: spacing.sm, fontWeight: '600' }]}>
-              AI Assist (Draft)
-            </Text>
-          </TouchableOpacity>
-
           <Controller
             control={control}
             name="title"
             render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                placeholder="What needs to be done?"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.title?.message}
-                autoFocus
-                style={{ fontSize: 22, fontWeight: '600', borderBottomWidth: 0, paddingHorizontal: 0, paddingVertical: spacing.md }}
-                containerStyle={{ marginBottom: spacing.sm }}
-              />
+              <View style={{ marginBottom: spacing.sm }}>
+                <TextInput
+                  placeholder="What needs to be done?"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholderTextColor={colors.textMuted}
+                  style={{ fontSize: 32, fontWeight: '700', color: colors.textPrimary, paddingVertical: spacing.sm, includeFontPadding: false }}
+                />
+                {errors.title?.message && (
+                  <Text style={[textStyles.caption, { color: colors.error }]}>{errors.title.message}</Text>
+                )}
+              </View>
             )}
           />
 
@@ -188,203 +188,260 @@ export default function NewTaskScreen() {
             control={control}
             name="description"
             render={({ field: { onChange, value } }) => (
-              <Input
-                placeholder="Add details (optional)"
+              <TextInput
+                placeholder="Add notes, context, or links..."
                 value={value}
                 onChangeText={onChange}
                 multiline
-                style={{ minHeight: 60, paddingHorizontal: 0 }}
-                containerStyle={{ marginBottom: spacing.xl }}
+                placeholderTextColor={colors.textMuted}
+                style={{ fontSize: 16, color: colors.textSecondary, minHeight: 60, paddingVertical: spacing.sm, marginBottom: spacing.xl, textAlignVertical: 'top' }}
               />
             )}
           />
 
-          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' }]}>Schedule</Text>
-          <View style={[styles.propertyGroup, { backgroundColor: colors.bg1, borderColor: colors.border, marginBottom: spacing.xl }]}>
-            
-            {/* Due Date */}
-            <TouchableOpacity style={[styles.propertyRow, { borderBottomColor: colors.border }]} onPress={() => setShowDatePicker(true)}>
-              <View style={styles.propertyLabel}>
-                <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
-                <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Date</Text>
-              </View>
-              <View style={styles.propertyValue}>
-                <Text style={[textStyles.bodyMd, { color: dueDate ? colors.textPrimary : colors.textMuted }]}>
-                  {dueDate ? format(dueDate, 'MMM d, yyyy') : 'Set date'}
-                </Text>
+          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 }]}>Schedule & Alerts</Text>
+          <View style={[styles.card, { backgroundColor: colors.bg2, borderColor: colors.border }]}>
+            {/* Due Date & Time Side by Side */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
+              <TouchableOpacity style={[styles.propertyRowHalf, { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border }]} onPress={() => setShowDatePicker(true)}>
+                <Ionicons name="calendar-outline" size={20} color={dueDate ? colors.accent : colors.textMuted} />
+                <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+                  <Text style={[textStyles.caption, { color: colors.textMuted }]}>Date</Text>
+                  <Text style={[textStyles.bodyMd, { color: dueDate ? colors.textPrimary : colors.textMuted, fontWeight: dueDate ? '600' : '400' }]}>
+                    {dueDate ? format(dueDate, 'MMM d, yyyy') : 'Anytime'}
+                  </Text>
+                </View>
                 {dueDate && (
-                  <TouchableOpacity onPress={() => setDueDate(null)} style={{ marginLeft: 8 }}>
-                    <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                  <TouchableOpacity onPress={() => setDueDate(null)}>
+                    <Ionicons name="close-circle" size={16} color={colors.textMuted} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 )}
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            {/* Due Time */}
-            <TouchableOpacity style={[styles.propertyRow, { borderBottomColor: 'transparent' }]} onPress={() => setShowTimePicker(true)}>
-              <View style={styles.propertyLabel}>
-                <Ionicons name="time-outline" size={20} color={colors.textMuted} />
-                <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Time</Text>
-              </View>
-              <View style={styles.propertyValue}>
-                <Text style={[textStyles.bodyMd, { color: dueTime ? colors.textPrimary : colors.textMuted }]}>
-                  {dueTime ? format(dueTime, 'h:mm a') : 'Set time'}
-                </Text>
+              <TouchableOpacity style={styles.propertyRowHalf} onPress={() => setShowTimePicker(true)}>
+                <Ionicons name="time-outline" size={20} color={dueTime ? colors.accent : colors.textMuted} />
+                <View style={{ marginLeft: spacing.sm, flex: 1 }}>
+                  <Text style={[textStyles.caption, { color: colors.textMuted }]}>Time</Text>
+                  <Text style={[textStyles.bodyMd, { color: dueTime ? colors.textPrimary : colors.textMuted, fontWeight: dueTime ? '600' : '400' }]}>
+                    {dueTime ? format(dueTime, 'h:mm a') : 'All day'}
+                  </Text>
+                </View>
                 {dueTime && (
-                  <TouchableOpacity onPress={() => setDueTime(null)} style={{ marginLeft: 8 }}>
-                    <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                  <TouchableOpacity onPress={() => setDueTime(null)}>
+                    <Ionicons name="close-circle" size={16} color={colors.textMuted} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 )}
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
+            {/* Repeat Type */}
+            <Controller
+              control={control}
+              name="repeatType"
+              render={({ field: { onChange, value } }) => (
+                <View style={[styles.propertyRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                  <View style={styles.propertyLabel}>
+                    <Ionicons name="repeat-outline" size={20} color={colors.textMuted} />
+                    <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Repeat</Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollSelector}>
+                    {repeatTypes.map(t => (
+                      <TouchableOpacity
+                        key={t.value}
+                        onPress={() => onChange(t.value)}
+                        style={[styles.chipBtn, value === t.value && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                      >
+                        <Text style={[textStyles.bodySm, { color: value === t.value ? '#fff' : colors.textSecondary }]}>{t.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            />
+
+            {/* Reminder */}
+            {dueDate && (
+              <View style={styles.propertyRow}>
+                <View style={styles.propertyLabel}>
+                  <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
+                  <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Alert</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollSelector}>
+                  {reminderPresets.map(preset => (
+                    <TouchableOpacity
+                      key={preset.value}
+                      onPress={() => setReminderType(preset.value)}
+                      style={[styles.chipBtn, reminderType === preset.value && { backgroundColor: colors.warning, borderColor: colors.warning }]}
+                    >
+                      <Text style={[textStyles.bodySm, { color: reminderType === preset.value ? '#000' : colors.textSecondary, fontWeight: reminderType === preset.value ? '600' : '400' }]}>{preset.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
-          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' }]}>Organization</Text>
-          <View style={[styles.propertyGroup, { backgroundColor: colors.bg1, borderColor: colors.border, marginBottom: spacing.xl }]}>
+          {/* Attachments Section */}
+          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 }]}>Attachments</Text>
+          <View style={[styles.card, { backgroundColor: colors.bg2, borderColor: colors.border, padding: spacing.md }]}>
+            
+            {attachments.length > 0 && (
+              <View style={styles.attachmentList}>
+                {attachments.map(file => (
+                  <View key={file.id} style={[styles.attachmentItem, { backgroundColor: colors.bg3, borderColor: colors.border }]}>
+                    <Ionicons name={file.type.includes('image') ? 'image-outline' : 'document-text-outline'} size={24} color={colors.accent} />
+                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                      <Text style={[textStyles.bodySm, { color: colors.textPrimary }]} numberOfLines={1}>{file.name}</Text>
+                      <Text style={[textStyles.caption, { color: colors.textMuted }]}>{(file.size / 1024 / 1024).toFixed(2)} MB</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleRemoveAttachment(file.id)} style={{ padding: 4 }}>
+                      <Ionicons name="close" size={20} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.dashedUploadBtn, { borderColor: colors.border }]} 
+              onPress={handleAddAttachment}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={20} color={colors.textMuted} />
+                  <Text style={[textStyles.bodyMd, { color: colors.textMuted, marginLeft: spacing.sm }]}>Tap to Upload File (Max 10MB)</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Organization */}
+          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 }]}>Organization</Text>
+          <View style={[styles.card, { backgroundColor: colors.bg2, borderColor: colors.border, marginBottom: spacing.xl }]}>
             
             {/* Priority */}
             <Controller
               control={control}
               name="priority"
               render={({ field: { onChange, value } }) => (
-                <View style={[styles.propertyRow, { borderBottomColor: colors.border, flexDirection: 'column', alignItems: 'stretch' }]}>
-                  <View style={[styles.propertyLabel, { marginBottom: spacing.sm }]}>
+                <View style={[styles.propertyRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
+                  <View style={styles.propertyLabel}>
                     <Ionicons name="flag-outline" size={20} color={colors.textMuted} />
                     <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Priority</Text>
                   </View>
-                  <View style={styles.prioritySelector}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollSelector}>
                     {priorities.map(p => (
                       <TouchableOpacity
                         key={p.value}
                         onPress={() => onChange(p.value)}
-                        style={[styles.priorityBtn, value === p.value && { backgroundColor: colors.bg3, borderColor: colors.border }]}
+                        style={[styles.chipBtn, value === p.value && { backgroundColor: colors.bg3, borderColor: colors.border }]}
                       >
-                        <Text style={[textStyles.bodySm, { color: colors[p.colorKey as keyof typeof colors] as string }]}>{p.label}</Text>
+                        <Text style={[textStyles.bodySm, { color: value === p.value ? colors[p.colorKey as keyof typeof colors] as string : colors.textMuted, fontWeight: value === p.value ? '600' : '400' }]}>{p.label}</Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
+                  </ScrollView>
                 </View>
               )}
             />
 
-            {/* Task Type */}
-            <Controller
-              control={control}
-              name="taskType"
-              render={({ field: { onChange, value } }) => (
-                <View style={[styles.propertyRow, { borderBottomColor: colors.border, flexDirection: 'column', alignItems: 'stretch' }]}>
-                  <View style={[styles.propertyLabel, { marginBottom: spacing.sm }]}>
-                    <Ionicons name="layers-outline" size={20} color={colors.textMuted} />
-                    <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Type</Text>
-                  </View>
-                  <View style={styles.prioritySelector}>
-                    {taskTypes.map(t => (
-                      <TouchableOpacity
-                        key={t.value}
-                        onPress={() => onChange(t.value)}
-                        style={[styles.priorityBtn, value === t.value && { backgroundColor: colors.bg3, borderColor: colors.border }]}
-                      >
-                        <Text style={[textStyles.bodySm, { color: value === t.value ? colors.textPrimary : colors.textMuted }]}>{t.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-            />
-
-            {/* Pinned Row */}
-            <Controller
-              control={control}
-              name="pinned"
-              render={({ field: { onChange, value } }) => (
-                <View style={[styles.propertyRow, { borderBottomColor: 'transparent' }]}>
-                  <View style={styles.propertyLabel}>
-                    <Ionicons name="pin-outline" size={20} color={colors.textMuted} />
-                    <Text style={[textStyles.bodyMd, { color: colors.textPrimary }]}>Pin to top</Text>
-                  </View>
-                  <Switch
-                    value={value}
-                    onValueChange={onChange}
-                    trackColor={{ false: colors.bg3, true: colors.accentMid }}
-                    thumbColor={value ? colors.accent : colors.textMuted}
-                  />
-                </View>
-              )}
-            />
-          </View>
-
-          {/* Subtasks Section */}
-          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' }]}>Subtasks</Text>
-          <View style={[styles.propertyGroup, { backgroundColor: colors.bg1, borderColor: colors.border, marginBottom: spacing.xl, padding: spacing.md }]}>
-            {subtasks.map(st => (
-              <View key={st.id} style={styles.subtaskItem}>
-                <Ionicons name="ellipse-outline" size={18} color={colors.textMuted} />
-                <Text style={[textStyles.body, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]}>{st.title}</Text>
-                <TouchableOpacity onPress={() => handleRemoveSubtask(st.id)}>
-                  <Ionicons name="trash-outline" size={18} color={colors.error} />
-                </TouchableOpacity>
-              </View>
-            ))}
-            <View style={styles.subtaskInputRow}>
-              <Ionicons name="add" size={20} color={colors.textMuted} />
-              <Input
-                placeholder="Add subtask..."
-                value={newSubtask}
-                onChangeText={setNewSubtask}
-                onSubmitEditing={handleAddSubtask}
-                containerStyle={{ flex: 1, marginLeft: spacing.sm, marginBottom: 0 }}
-                style={{ paddingVertical: spacing.sm, borderBottomWidth: 0 }}
-              />
-              <Button label="Add" onPress={handleAddSubtask} variant="ghost" size="sm" />
+            {/* Subtasks UI Minimal */}
+            <View style={[styles.propertyRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingVertical: spacing.md }]}>
+               <View style={{ flex: 1 }}>
+                 {subtasks.map(st => (
+                   <View key={st.id} style={[styles.subtaskItem, { borderBottomColor: colors.border }]}>
+                     <Ionicons name="ellipse-outline" size={14} color={colors.textMuted} />
+                     <Text style={[textStyles.bodyMd, { color: colors.textPrimary, flex: 1, marginLeft: spacing.sm }]} numberOfLines={1}>{st.title}</Text>
+                     <TouchableOpacity onPress={() => setSubtasks(subtasks.filter(s => s.id !== st.id))}>
+                       <Ionicons name="close" size={18} color={colors.error} />
+                     </TouchableOpacity>
+                   </View>
+                 ))}
+                 <View style={styles.subtaskInputRow}>
+                    <Ionicons name="add-circle-outline" size={20} color={colors.textMuted} />
+                    <Input
+                      placeholder="Add subtask..."
+                      value={newSubtask}
+                      onChangeText={setNewSubtask}
+                      onSubmitEditing={() => {
+                        if (newSubtask.trim()) {
+                          setSubtasks([...subtasks, { id: Date.now().toString(), title: newSubtask.trim(), completed: false }]);
+                          setNewSubtask('');
+                        }
+                      }}
+                      containerStyle={{ flex: 1, marginLeft: spacing.sm, marginBottom: 0 }}
+                      style={{ paddingVertical: spacing.xs, borderBottomWidth: 0, fontSize: 16 }}
+                    />
+                 </View>
+               </View>
             </View>
-          </View>
 
-          {/* Tags Section */}
-          <Text style={[textStyles.labelSm, { color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' }]}>Tags</Text>
-          <View style={[styles.propertyGroup, { backgroundColor: colors.bg1, borderColor: colors.border, marginBottom: spacing.xl, padding: spacing.md }]}>
-            <View style={styles.tagsContainer}>
-              {tags.map(tag => (
-                <View key={tag} style={[styles.tagChip, { backgroundColor: colors.bg3 }]}>
-                  <Text style={[textStyles.labelSm, { color: colors.textPrimary }]}>#{tag}</Text>
-                  <TouchableOpacity onPress={() => handleRemoveTag(tag)} style={{ marginLeft: 4 }}>
-                    <Ionicons name="close" size={14} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+            {/* Tags UI Minimal */}
+            <View style={[styles.propertyRow, { paddingVertical: spacing.md }]}>
+               <View style={{ flex: 1 }}>
+                 {tags.length > 0 && (
+                   <View style={styles.tagsContainer}>
+                     {tags.map(tag => (
+                       <View key={tag} style={[styles.tagBadge, { backgroundColor: colors.bg3, borderColor: colors.border }]}>
+                         <Text style={[textStyles.caption, { color: colors.textPrimary }]}>#{tag}</Text>
+                         <TouchableOpacity onPress={() => setTags(tags.filter(t => t !== tag))} style={{ marginLeft: 6 }}>
+                           <Ionicons name="close" size={12} color={colors.textMuted} />
+                         </TouchableOpacity>
+                       </View>
+                     ))}
+                   </View>
+                 )}
+                 <View style={styles.subtaskInputRow}>
+                    <Ionicons name="pricetag-outline" size={20} color={colors.textMuted} />
+                    <Input
+                      placeholder="Add tag (e.g. Work, Urgent)"
+                      value={newTag}
+                      onChangeText={setNewTag}
+                      onSubmitEditing={() => {
+                        if (newTag.trim() && !tags.includes(newTag.trim())) {
+                          setTags([...tags, newTag.trim()]);
+                          setNewTag('');
+                        }
+                      }}
+                      containerStyle={{ flex: 1, marginLeft: spacing.sm, marginBottom: 0 }}
+                      style={{ paddingVertical: spacing.xs, borderBottomWidth: 0, fontSize: 16 }}
+                    />
+                 </View>
+               </View>
             </View>
-            <View style={[styles.subtaskInputRow, { marginTop: tags.length > 0 ? spacing.sm : 0 }]}>
-              <Ionicons name="pricetag-outline" size={20} color={colors.textMuted} />
-              <Input
-                placeholder="Add tag (e.g. Work)"
-                value={newTag}
-                onChangeText={setNewTag}
-                onSubmitEditing={handleAddTag}
-                containerStyle={{ flex: 1, marginLeft: spacing.sm, marginBottom: 0 }}
-                style={{ paddingVertical: spacing.sm, borderBottomWidth: 0 }}
-              />
-              <Button label="Add" onPress={handleAddTag} variant="ghost" size="sm" />
-            </View>
-          </View>
 
+          </View>
+          
+          <View style={{ height: 120 }} />
         </ScrollView>
+
+        {/* Floating Action Button */}
+        <View style={[styles.floatingAction, { bottom: Math.max(insets.bottom, spacing.base) + spacing.md }]}>
+          <TouchableOpacity 
+            style={[styles.saveBtn, { backgroundColor: createTask.isPending || isUploading ? colors.textMuted : colors.accent }]}
+            onPress={handleSubmit(onSubmit)}
+            disabled={createTask.isPending || isUploading}
+            activeOpacity={0.8}
+          >
+            {createTask.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={[textStyles.bodyLg, { color: '#fff', fontWeight: '600', marginLeft: spacing.sm }]}>Create Task</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
 
       {showDatePicker && (
-        <DateTimePicker
-          value={dueDate || new Date()}
-          mode="date"
-          display="default"
-          onChange={onChangeDate}
-        />
+        <DateTimePicker value={dueDate || new Date()} mode="date" display="default" onChange={(e, d) => { setShowDatePicker(false); if(d) setDueDate(d); }} />
       )}
       {showTimePicker && (
-        <DateTimePicker
-          value={dueTime || new Date()}
-          mode="time"
-          display="default"
-          onChange={onChangeTime}
-        />
+        <DateTimePicker value={dueTime || new Date()} mode="time" display="default" onChange={(e, d) => { setShowTimePicker(false); if(d) setDueTime(d); }} />
       )}
     </Screen>
   );
@@ -396,84 +453,112 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.base,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
+    paddingVertical: spacing.sm,
   },
   headerBtn: {
     padding: spacing.xs,
   },
   content: {
     padding: spacing.base,
-    paddingBottom: 100,
   },
-  aiAssistBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginBottom: spacing.lg,
-  },
-  propertyGroup: {
+  card: {
     borderRadius: radii.xl,
     borderWidth: 1,
     overflow: 'hidden',
+    marginBottom: spacing.lg,
   },
-  propertyRow: {
+  propertyRowHalf: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: spacing.md,
+  },
+  propertyRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   propertyLabel: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.sm,
     gap: spacing.sm,
   },
-  propertyValue: {
+  scrollSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  prioritySelector: {
-    flexDirection: 'row',
     gap: spacing.xs,
-    flexWrap: 'wrap',
   },
-  priorityBtn: {
-    paddingHorizontal: spacing.sm,
+  chipBtn: {
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.md,
+    borderRadius: radii.full,
     borderWidth: 1,
     borderColor: 'transparent',
-    minWidth: 60,
     alignItems: 'center',
+    marginRight: spacing.xs,
   },
   subtaskItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#333',
   },
   subtaskInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  tagChip: {
+  tagBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
+    borderRadius: radii.md,
+    borderWidth: 1,
+  },
+  attachmentList: {
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  attachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+  },
+  dashedUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: radii.lg,
+  },
+  floatingAction: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+  },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
     borderRadius: radii.full,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });

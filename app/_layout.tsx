@@ -1,3 +1,4 @@
+import '@/src/lib/suppressWarnings';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +16,7 @@ import {
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeContext';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useAppLockStore } from '@/src/stores/appLockStore';
+import { useNotifications } from '@/src/hooks/useNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,6 +33,7 @@ function AppNavigator() {
   const { colors, isDark } = useTheme();
   const { initialize, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const { initializeLock, lockEnabled, isLocked } = useAppLockStore();
+  useNotifications(); // Initialize notification listeners globally
 
   useEffect(() => {
     Promise.all([initialize(), initializeLock()]);
