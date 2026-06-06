@@ -1,42 +1,42 @@
 // ─── Color Palette ───────────────────────────────────────────────────────────
 
 export const palette = {
-  // Backgrounds
-  bg0: '#0D0F14',
-  bg1: '#161A23',
-  bg2: '#1E2330',
-  bg3: '#252A3A',
+  // Backgrounds (ASTRA Dark - Rich Charcoal)
+  bg0: '#121212',
+  bg1: '#1C1C1E', // Slate Surface
+  bg2: '#2C2C2E',
+  bg3: '#3A3A3C',
 
   // Borders
-  border: '#2A3040',
-  borderLight: '#353D52',
+  border: '#2C2C2E',
+  borderLight: '#3A3A3C',
 
-  // Accent (violet-purple, overridable via settings)
-  accent: '#6C63FF',
-  accentSoft: 'rgba(108,99,255,0.12)',
-  accentMid: 'rgba(108,99,255,0.28)',
+  // Accent (Premium Violet)
+  accent: '#7C3AED',
+  accentSoft: 'rgba(124, 58, 237, 0.15)',
+  accentMid: 'rgba(124, 58, 237, 0.3)',
 
   // Text
-  textPrimary: '#F0F2F8',
-  textSecondary: '#8B92A5',
-  textMuted: '#555C6E',
-  textDisabled: '#3A4055',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#A1A1AA',
+  textMuted: '#71717A',
+  textDisabled: '#52525B',
 
   // Semantic
-  success: '#4ADE80',
-  successSoft: 'rgba(74,222,128,0.12)',
-  warning: '#FBBF24',
-  warningSoft: 'rgba(251,191,36,0.12)',
-  error: '#F87171',
-  errorSoft: 'rgba(248,113,113,0.12)',
-  info: '#60A5FA',
-  infoSoft: 'rgba(96,165,250,0.12)',
+  success: '#10B981', // Emerald Green
+  successSoft: 'rgba(16,185,129,0.15)',
+  warning: '#F59E0B', // Amber
+  warningSoft: 'rgba(245,158,11,0.15)',
+  error: '#F43F5E', // Coral Red
+  errorSoft: 'rgba(244,63,94,0.15)',
+  info: '#3B82F6',
+  infoSoft: 'rgba(59,130,246,0.15)',
 
   // Priority
-  priorityHigh: '#F87171',
-  priorityMedium: '#FBBF24',
-  priorityLow: '#60A5FA',
-  priorityNone: '#555C6E',
+  priorityHigh: '#F43F5E',
+  priorityMedium: '#F59E0B',
+  priorityLow: '#3B82F6',
+  priorityNone: '#71717A',
 
   // Always
   white: '#FFFFFF',
@@ -44,77 +44,93 @@ export const palette = {
   transparent: 'transparent',
 } as const;
 
-// Light mode overrides
+// Light mode overrides (ASTRA Light - Soft Warm White)
 export const lightPalette = {
-  bg0: '#F4F6FB',
-  bg1: '#FFFFFF',
-  bg2: '#EEF1F8',
-  bg3: '#E5E9F4',
-  border: '#D5DAEB',
-  borderLight: '#C8CDE0',
-  textPrimary: '#0D0F14',
-  textSecondary: '#4A5168',
-  textMuted: '#8B92A5',
-  textDisabled: '#C0C6D8',
+  bg0: '#FAFAFA', // Soft Warm White
+  bg1: '#FFFFFF', // Pure White Cards
+  bg2: '#F4F4F5',
+  bg3: '#E4E4E7',
+  border: '#F4F4F5',
+  borderLight: '#E4E4E7',
+  textPrimary: '#18181B', // Deep Charcoal
+  textSecondary: '#52525B',
+  textMuted: '#A1A1AA',
+  textDisabled: '#D4D4D8',
 } as const;
 
-// ─── Spacing Scale ────────────────────────────────────────────────────────────
+// Pastel Note Colors (For Masonry Grid)
+export const noteColors = {
+  light: {
+    lavender: '#F3E8FF',
+    mint: '#D1FAE5',
+    sky: '#E0F2FE',
+    peach: '#FFEDD5',
+    cream: '#FEF3C7',
+  },
+  dark: {
+    lavender: '#4C1D95',
+    mint: '#064E3B',
+    sky: '#0C4A6E',
+    peach: '#7C2D12',
+    cream: '#78350F',
+  }
+} as const;
+
+// ─── Spacing Scale (Strict ASTRA Scale) ───────────────────────────────────────
 
 export const spacing = {
-  xxs: 2,
-  xs: 4,
-  sm: 8,
-  md: 12,
-  base: 16,
+  xs: 8,
+  sm: 12,
+  md: 16,
   lg: 20,
   xl: 24,
   '2xl': 32,
   '3xl': 40,
-  '4xl': 48,
-  '5xl': 64,
+  // Mapping 'base' to 'md' for backward compatibility in codebase
+  base: 16,
 } as const;
 
-// ─── Border Radii ─────────────────────────────────────────────────────────────
+// ─── Border Radii (ASTRA Specs) ───────────────────────────────────────────────
 
 export const radii = {
-  xs: 4,
   sm: 8,
   md: 12,
-  lg: 16,
-  xl: 20,
-  '2xl': 24,
+  lg: 16, // Buttons
+  xl: 24, // Cards / Dialogs
+  '2xl': 28, // Large Cards
+  '3xl': 32, // Bottom Sheets
   full: 9999,
 } as const;
 
-// ─── Shadows ──────────────────────────────────────────────────────────────────
+// ─── Shadows (Subtle & Elevated) ──────────────────────────────────────────────
 
 export const shadows = {
   sm: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.08,
     shadowRadius: 24,
-    elevation: 12,
+    elevation: 6,
   },
   accent: {
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
     elevation: 8,
   },
 } as const;
@@ -133,12 +149,10 @@ export const zIndex = {
 // ─── Accent Color Presets ─────────────────────────────────────────────────────
 
 export const accentPresets = [
-  { name: 'Violet', value: '#6C63FF' },
+  { name: 'Violet', value: '#7C3AED' },
   { name: 'Indigo', value: '#6366F1' },
-  { name: 'Cyan', value: '#06B6D4' },
   { name: 'Emerald', value: '#10B981' },
-  { name: 'Rose', value: '#F43F5E' },
-  { name: 'Amber', value: '#F59E0B' },
+  { name: 'Coral', value: '#F43F5E' },
 ] as const;
 
 export type AccentColor = (typeof accentPresets)[number]['value'];

@@ -1,9 +1,10 @@
 import { databases, DB_ID, COLLECTIONS, ID, Query } from '../appwrite';
 import { useAuthStore } from '../../stores/authStore';
 
-export type TaskPriority = 'none' | 'low' | 'medium' | 'high';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'archived';
-export type RepeatType = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'archived' | 'delayed' | 'cancelled';
+export type RepeatType = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom' | 'weekday';
+export type TaskType = 'one_time' | 'recurring' | 'deadline' | 'reminder_only' | 'checklist';
 
 export interface Task {
   $id: string;
@@ -18,6 +19,21 @@ export interface Task {
   categoryId?: string;
   pinned: boolean;
   archived: boolean;
+  
+  // Advanced features
+  taskType?: TaskType;
+  startTime?: string;
+  endTime?: string;
+  durationMinutes?: number;
+  tags?: string[];
+  subtasks?: string[]; // JSON string array
+  reminders?: string[];
+  attachments?: string[];
+  notes?: string;
+  location?: string;
+  projectId?: string;
+  progress?: number;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +48,18 @@ export interface CreateTaskPayload {
   repeatConfig?: string;
   categoryId?: string;
   pinned?: boolean;
+  taskType?: TaskType;
+  startTime?: string;
+  endTime?: string;
+  durationMinutes?: number;
+  tags?: string[];
+  subtasks?: string[];
+  reminders?: string[];
+  attachments?: string[];
+  notes?: string;
+  location?: string;
+  projectId?: string;
+  progress?: number;
 }
 
 export interface UpdateTaskPayload extends Partial<CreateTaskPayload> {
@@ -93,6 +121,18 @@ export async function createTask(payload: CreateTaskPayload) {
     repeatConfig: payload.repeatConfig || null,
     categoryId: payload.categoryId || null,
     pinned: payload.pinned || false,
+    taskType: payload.taskType || 'one_time',
+    startTime: payload.startTime || null,
+    endTime: payload.endTime || null,
+    durationMinutes: payload.durationMinutes || null,
+    tags: payload.tags || [],
+    subtasks: payload.subtasks || [],
+    reminders: payload.reminders || [],
+    attachments: payload.attachments || [],
+    notes: payload.notes || null,
+    location: payload.location || null,
+    projectId: payload.projectId || null,
+    progress: payload.progress || 0,
     archived: false,
     createdAt: now,
     updatedAt: now,
@@ -126,6 +166,19 @@ export async function updateTask(id: string, payload: UpdateTaskPayload) {
   if (payload.categoryId !== undefined) data.categoryId = payload.categoryId;
   if (payload.pinned !== undefined) data.pinned = payload.pinned;
   if (payload.archived !== undefined) data.archived = payload.archived;
+  
+  if (payload.taskType !== undefined) data.taskType = payload.taskType;
+  if (payload.startTime !== undefined) data.startTime = payload.startTime;
+  if (payload.endTime !== undefined) data.endTime = payload.endTime;
+  if (payload.durationMinutes !== undefined) data.durationMinutes = payload.durationMinutes;
+  if (payload.tags !== undefined) data.tags = payload.tags;
+  if (payload.subtasks !== undefined) data.subtasks = payload.subtasks;
+  if (payload.reminders !== undefined) data.reminders = payload.reminders;
+  if (payload.attachments !== undefined) data.attachments = payload.attachments;
+  if (payload.notes !== undefined) data.notes = payload.notes;
+  if (payload.location !== undefined) data.location = payload.location;
+  if (payload.projectId !== undefined) data.projectId = payload.projectId;
+  if (payload.progress !== undefined) data.progress = payload.progress;
 
   const response = await databases.updateDocument(
     DB_ID,

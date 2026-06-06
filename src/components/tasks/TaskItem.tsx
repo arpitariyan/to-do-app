@@ -16,6 +16,7 @@ interface TaskItemProps {
 
 const getPriorityColor = (priority: TaskPriority, colors: any) => {
   switch (priority) {
+    case 'urgent': return colors.accent;
     case 'high': return colors.error;
     case 'medium': return colors.warning;
     case 'low': return colors.success;
@@ -45,6 +46,21 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
   const priorityColor = getPriorityColor(task.priority, colors);
   const isOverdue = task.dueAt && isPast(new Date(task.dueAt)) && !isDone && !isToday(new Date(task.dueAt));
 
+  // Parse subtasks to get progress
+  let completedSubtasks = 0;
+  let totalSubtasks = 0;
+  if (task.subtasks && task.subtasks.length > 0) {
+    totalSubtasks = task.subtasks.length;
+    completedSubtasks = task.subtasks.filter(st => {
+      try {
+        const parsed = typeof st === 'string' ? JSON.parse(st) : st;
+        return parsed.completed;
+      } catch (e) {
+        return false;
+      }
+    }).length;
+  }
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -71,7 +87,7 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
         </Text>
         
         {/* Metadata Row */}
-        {(task.description || task.dueAt) && (
+        {(task.description || task.dueAt || totalSubtasks > 0 || (task.tags && task.tags.length > 0) || task.taskType === 'recurring') && (
           <View style={styles.metaRow}>
             {task.dueAt && (
               <View style={styles.metaItem}>
@@ -85,13 +101,43 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
                   { color: isOverdue ? colors.error : colors.textMuted }
                 ]}>
                   {formatDueDate(task.dueAt)}
+                  {task.dueAt.includes('T') && new Date(task.dueAt).getHours() !== 23 ? ` at ${format(new Date(task.dueAt), 'h:mm a')}` : ''}
                 </Text>
               </View>
             )}
+
+            {task.taskType === 'recurring' && (
+              <View style={styles.metaItem}>
+                <Ionicons name="repeat" size={12} color={colors.accent} />
+              </View>
+            )}
             
-            {task.description && (
+            {totalSubtasks > 0 && (
+              <View style={styles.metaItem}>
+                <Ionicons name="git-merge-outline" size={12} color={completedSubtasks === totalSubtasks ? colors.success : colors.textMuted} />
+                <Text style={[textStyles.caption, { color: completedSubtasks === totalSubtasks ? colors.success : colors.textMuted }]}>
+                  {completedSubtasks}/{totalSubtasks}
+                </Text>
+              </View>
+            )}
+
+            {task.description && !task.notes && (
               <View style={styles.metaItem}>
                 <Ionicons name="document-text-outline" size={12} color={colors.textMuted} />
+              </View>
+            )}
+
+            {task.notes && (
+              <View style={styles.metaItem}>
+                <Ionicons name="journal-outline" size={12} color={colors.accent} />
+              </View>
+            )}
+
+            {task.tags && task.tags.length > 0 && (
+              <View style={[styles.tagBadge, { backgroundColor: colors.bg2 }]}>
+                <Text style={[textStyles.caption, { color: colors.textPrimary, fontSize: 10 }]}>
+                  {task.tags[0]} {task.tags.length > 1 ? `+${task.tags.length - 1}` : ''}
+                </Text>
               </View>
             )}
           </View>
@@ -146,5 +192,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  tagBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.md,
+    marginLeft: 'auto',
   },
 });

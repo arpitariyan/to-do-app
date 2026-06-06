@@ -9,15 +9,12 @@ export const fontFamily = {
 } as const;
 
 export const fontSize = {
-  xs: 11,
-  sm: 12,
-  base: 14,
-  md: 15,
-  lg: 17,
-  xl: 20,
-  '2xl': 24,
-  '3xl': 28,
-  '4xl': 34,
+  caption: 12,
+  meta: 13,
+  body: 15,
+  cardTitle: 18,
+  sectionTitle: 20,
+  screenTitle: 32,
 } as const;
 
 export const lineHeight = {
@@ -31,78 +28,53 @@ export const letterSpacing = {
   tight: -0.5,
   normal: 0,
   wide: 0.3,
-  wider: 0.6,
-  widest: 1.2,
 } as const;
 
-// Composed text styles
+// Composed text styles matching ASTRA PRD
 export const textStyles = {
-  displayLg: {
-    fontSize: fontSize['4xl'],
+  screenTitle: {
+    fontSize: fontSize.screenTitle,
     fontFamily: fontFamily.bold,
-    lineHeight: fontSize['4xl'] * lineHeight.tight,
+    lineHeight: fontSize.screenTitle * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
-  displayMd: {
-    fontSize: fontSize['3xl'],
-    fontFamily: fontFamily.bold,
-    lineHeight: fontSize['3xl'] * lineHeight.tight,
-    letterSpacing: letterSpacing.tight,
-  },
-  headingLg: {
-    fontSize: fontSize['2xl'],
-    fontFamily: fontFamily.bold,
-    lineHeight: fontSize['2xl'] * lineHeight.snug,
-  },
-  headingMd: {
-    fontSize: fontSize.xl,
+  sectionTitle: {
+    fontSize: fontSize.sectionTitle,
     fontFamily: fontFamily.semiBold,
-    lineHeight: fontSize.xl * lineHeight.snug,
+    lineHeight: fontSize.sectionTitle * lineHeight.snug,
   },
-  headingSm: {
-    fontSize: fontSize.lg,
+  cardTitle: {
+    fontSize: fontSize.cardTitle,
     fontFamily: fontFamily.semiBold,
-    lineHeight: fontSize.lg * lineHeight.snug,
+    lineHeight: fontSize.cardTitle * lineHeight.snug,
   },
-  bodyLg: {
-    fontSize: fontSize.md,
+  body: {
+    fontSize: fontSize.body,
     fontFamily: fontFamily.regular,
-    lineHeight: fontSize.md * lineHeight.normal,
+    lineHeight: fontSize.body * lineHeight.normal,
   },
-  bodyMd: {
-    fontSize: fontSize.base,
+  meta: {
+    fontSize: fontSize.meta,
     fontFamily: fontFamily.regular,
-    lineHeight: fontSize.base * lineHeight.normal,
-  },
-  bodySm: {
-    fontSize: fontSize.sm,
-    fontFamily: fontFamily.regular,
-    lineHeight: fontSize.sm * lineHeight.normal,
-  },
-  labelLg: {
-    fontSize: fontSize.base,
-    fontFamily: fontFamily.medium,
-    lineHeight: fontSize.base * lineHeight.normal,
-  },
-  labelMd: {
-    fontSize: fontSize.sm,
-    fontFamily: fontFamily.medium,
-    lineHeight: fontSize.sm * lineHeight.normal,
-  },
-  labelSm: {
-    fontSize: fontSize.xs,
-    fontFamily: fontFamily.medium,
-    lineHeight: fontSize.xs * lineHeight.normal,
-    letterSpacing: letterSpacing.wide,
+    lineHeight: fontSize.meta * lineHeight.normal,
   },
   caption: {
-    fontSize: fontSize.xs,
+    fontSize: fontSize.caption,
     fontFamily: fontFamily.regular,
-    lineHeight: fontSize.xs * lineHeight.normal,
+    lineHeight: fontSize.caption * lineHeight.normal,
   },
-  mono: {
-    fontSize: fontSize.sm,
-    fontFamily: Platform.select({ android: 'monospace', default: 'Courier New' }),
-    lineHeight: fontSize.sm * lineHeight.relaxed,
-  },
+  
+  // Legacy mappings to prevent app from crashing immediately while we migrate
+  // We will migrate all screens to use the exact ASTRA styles above
+  displayLg: { fontSize: fontSize.screenTitle, fontFamily: fontFamily.bold },
+  displayMd: { fontSize: fontSize.screenTitle, fontFamily: fontFamily.bold },
+  headingLg: { fontSize: fontSize.screenTitle, fontFamily: fontFamily.bold },
+  headingMd: { fontSize: fontSize.sectionTitle, fontFamily: fontFamily.semiBold },
+  headingSm: { fontSize: fontSize.cardTitle, fontFamily: fontFamily.semiBold },
+  bodyLg: { fontSize: fontSize.body, fontFamily: fontFamily.regular },
+  bodyMd: { fontSize: fontSize.body, fontFamily: fontFamily.regular },
+  bodySm: { fontSize: fontSize.meta, fontFamily: fontFamily.regular },
+  labelLg: { fontSize: fontSize.body, fontFamily: fontFamily.medium },
+  labelMd: { fontSize: fontSize.meta, fontFamily: fontFamily.medium },
+  labelSm: { fontSize: fontSize.caption, fontFamily: fontFamily.medium },
 } as const;

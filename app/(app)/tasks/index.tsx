@@ -1,27 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../../src/theme/ThemeContext';
-import { spacing, radii } from '../../../src/theme/tokens';
-import { textStyles } from '../../../src/theme/typography';
-import { Screen } from '../../../src/components/layout/Screen';
-import { TaskItem } from '../../../src/components/tasks/TaskItem';
-import { useTasks, useUpdateTask } from '../../../src/hooks/useTasks';
-import type { TaskStatus } from '../../../src/lib/api/tasks';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useTheme } from '@/src/theme/ThemeContext';
+import { spacing, radii } from '@/src/theme/tokens';
+import { textStyles } from '@/src/theme/typography';
+import { Screen } from '@/src/components/layout/Screen';
+import { TaskItem } from '@/src/components/tasks/TaskItem';
+import { useTasks, useUpdateTask } from '@/src/hooks/useTasks';
+
+type FilterType = 'today' | 'upcoming' | 'completed';
 
 export default function TasksScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   
-  const [filter, setFilter] = useState<'todo' | 'done'>('todo');
+  const [filter, setFilter] = useState<FilterType>('today');
+  const [searchQuery, setSearchQuery] = useState('');
   
-  // Fetch tasks using React Query
-  const { data: tasks, isLoading, error } = useTasks({ 
-    archived: false,
-    status: filter === 'done' ? 'done' : undefined // If 'todo', we might want to fetch 'todo' + 'in_progress', but API handles exact match. We'll filter on client for multiple if needed, or update API. Wait, API only supports exact status or undefined. If undefined, we get all, then filter locally, or we fetch everything and filter locally. Let's fetch all active tasks and filter locally to avoid refetching on tab switch.
-  });
-  
+  const { data: tasks = [], isLoading, error } = useTasks({ archived: false });
   const updateTask = useUpdateTask();
 
   const handleToggleTask = (id: string, newStatus: 'todo' | 'done') => {
@@ -32,32 +30,75 @@ export default function TasksScreen() {
     router.push({ pathname: '/tasks/[id]', params: { id } });
   };
 
-  // Filter tasks locally to allow instant tab switching
-  const filteredTasks = tasks?.filter(t => 
-    filter === 'todo' ? t.status !== 'done' : t.status === 'done'
-  ) || [];
+  const filteredTasks = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    let result = tasks;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      result = result.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    // Tab filter
+    if (filter === 'completed') {
+      result = result.filter(t => t.status === 'done');
+    } else if (filter === 'today') {
+      result = result.filter(t => t.status !== 'done' && t.dueAt && new Date(t.dueAt) < tomorrowStart);
+    } else if (filter === 'upcoming') {
+      result = result.filter(t => t.status !== 'done' && (!t.dueAt || new Date(t.dueAt) >= tomorrowStart));
+    }
+
+    return result;
+  }, [tasks, filter, searchQuery]);
 
   return (
     <Screen withBottomPad>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[textStyles.headingLg, { color: colors.textPrimary }]}>Tasks</Text>
+        <Text style={[textStyles.screenTitle, { color: colors.textPrimary }]}>Tasks</Text>
       </View>
 
-      {/* Tabs */}
+      {/* Search Bar */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.bg2, borderColor: colors.border }]}>
+        <Ionicons name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Inter_400Regular' }]}
+          placeholder="Search tasks..."
+          placeholderTextColor={colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Segmented Control */}
       <View style={[styles.tabsContainer, { backgroundColor: colors.bg2 }]}>
-        <TouchableOpacity 
-          style={[styles.tab, filter === 'todo' && { backgroundColor: colors.bg1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }]} 
-          onPress={() => setFilter('todo')}
-        >
-          <Text style={[textStyles.labelMd, { color: filter === 'todo' ? colors.textPrimary : colors.textMuted }]}>To-Do</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, filter === 'done' && { backgroundColor: colors.bg1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }]} 
-          onPress={() => setFilter('done')}
-        >
-          <Text style={[textStyles.labelMd, { color: filter === 'done' ? colors.textPrimary : colors.textMuted }]}>Completed</Text>
-        </TouchableOpacity>
+        {(['today', 'upcoming', 'completed'] as FilterType[]).map((tab) => {
+          const isActive = filter === tab;
+          return (
+            <TouchableOpacity 
+              key={tab}
+              style={[
+                styles.tab, 
+                isActive && { backgroundColor: colors.bg1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }
+              ]} 
+              onPress={() => setFilter(tab)}
+              activeOpacity={0.8}
+            >
+              <Text style={[textStyles.body, { color: isActive ? colors.textPrimary : colors.textMuted, fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* List */}
@@ -67,38 +108,49 @@ export default function TasksScreen() {
         </View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={[textStyles.bodyMd, { color: colors.error }]}>Failed to load tasks</Text>
+          <Text style={[textStyles.body, { color: colors.error }]}>Failed to load tasks</Text>
         </View>
       ) : filteredTasks.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="checkmark-done-circle-outline" size={64} color={colors.border} />
-          <Text style={[textStyles.bodyLg, { color: colors.textMuted, marginTop: spacing.md }]}>
-            {filter === 'todo' ? "You're all caught up!" : "No completed tasks yet."}
+        <Animated.View entering={FadeInDown} style={styles.center}>
+          <View style={[styles.emptyIconBg, { backgroundColor: colors.bg2 }]}>
+            <Ionicons 
+              name={filter === 'completed' ? "checkmark-done-circle-outline" : "calendar-clear-outline"} 
+              size={48} 
+              color={colors.textMuted} 
+            />
+          </View>
+          <Text style={[textStyles.sectionTitle, { color: colors.textPrimary, marginTop: spacing.lg }]}>
+            {searchQuery ? "No matches found" : (filter === 'completed' ? "No completed tasks" : "You're all caught up!")}
           </Text>
-        </View>
+          <Text style={[textStyles.body, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+            {searchQuery ? "Try a different search term." : "Take a break or plan something new."}
+          </Text>
+        </Animated.View>
       ) : (
         <FlatList
           data={filteredTasks}
           keyExtractor={(item) => item.$id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TaskItem 
-              task={item} 
-              onToggle={handleToggleTask} 
-              onPress={handlePressTask} 
-            />
+          renderItem={({ item, index }) => (
+            <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
+              <TaskItem 
+                task={item} 
+                onToggle={handleToggleTask} 
+                onPress={handlePressTask} 
+              />
+            </Animated.View>
           )}
         />
       )}
 
       {/* FAB */}
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.9}
         onPress={() => router.push('/tasks/new')}
-        style={[styles.fab, { backgroundColor: colors.accent }]}
+        style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
       >
-        <Ionicons name="add" size={28} color="#FFF" />
+        <Ionicons name="add" size={32} color="#FFF" />
       </TouchableOpacity>
     </Screen>
   );
@@ -106,15 +158,33 @@ export default function TasksScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    paddingVertical: spacing.base,
-    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    marginBottom: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 15,
   },
   tabsContainer: {
     flexDirection: 'row',
-    marginHorizontal: spacing.base,
+    marginHorizontal: spacing.lg,
     padding: 4,
     borderRadius: radii.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   tab: {
     flex: 1,
@@ -123,28 +193,36 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   listContent: {
-    paddingHorizontal: spacing.base,
-    paddingBottom: 100, // space for FAB
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 140, // space for FAB and floating tab bar
+    gap: spacing.sm,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 100,
+    paddingHorizontal: spacing.xl,
+  },
+  emptyIconBg: {
+    width: 96,
+    height: 96,
+    borderRadius: radii['2xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 96,
+    right: spacing.lg,
+    width: 64,
+    height: 64,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 16,
+    elevation: 8,
   },
 });

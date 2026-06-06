@@ -19,17 +19,18 @@ import type { TaskPriority } from '../../../src/lib/api/tasks';
 const taskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(512),
   description: z.string().max(4096).optional(),
-  priority: z.enum(['none', 'low', 'medium', 'high']),
+  priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']),
   pinned: z.boolean(),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
 
-const priorities: { label: string; value: TaskPriority; colorKey: 'textMuted' | 'success' | 'warning' | 'error' }[] = [
+const priorities: { label: string; value: TaskPriority; colorKey: 'textMuted' | 'success' | 'warning' | 'error' | 'accent' }[] = [
   { label: 'None', value: 'none', colorKey: 'textMuted' },
   { label: 'Low', value: 'low', colorKey: 'success' },
   { label: 'Medium', value: 'medium', colorKey: 'warning' },
   { label: 'High', value: 'high', colorKey: 'error' },
+  { label: 'Urgent', value: 'urgent', colorKey: 'accent' },
 ];
 
 export default function EditTaskScreen() {

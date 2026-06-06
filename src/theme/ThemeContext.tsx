@@ -51,7 +51,7 @@ export interface ThemeContextValue {
 
 const THEME_MODE_KEY = '@nexus/theme_mode';
 const ACCENT_COLOR_KEY = '@nexus/accent_color';
-const DEFAULT_ACCENT: AccentColor = '#6C63FF';
+const DEFAULT_ACCENT: AccentColor = '#7C3AED';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 

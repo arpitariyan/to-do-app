@@ -23,7 +23,6 @@ export function Screen({ children, style, noPadding = false, withBottomPad = fal
         style={[
           styles.safe,
           !noPadding && styles.padded,
-          withBottomPad && { paddingBottom: insets.bottom + spacing['3xl'] },
           style,
         ]}
         edges={['top', 'left', 'right']}
