@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
+import { documentDirectory, getInfoAsync, downloadAsync, cacheDirectory } from 'expo-file-system/legacy';
 import { storage, ID, STORAGE_BUCKETS, ENDPOINT, PROJECT_ID } from '../lib/appwrite';
 
 export interface Attachment {
@@ -7,7 +8,7 @@ export interface Attachment {
   name: string;
   type: string;
   size: number;
-  uri: string;
+  uri?: string;
   url?: string;
 }
 
@@ -74,7 +75,44 @@ export function useAttachments() {
   };
 
   const getFileDownloadUrl = (fileId: string) => {
-    return storage.getFileDownload(STORAGE_BUCKETS.ATTACHMENTS, fileId);
+    return `${ENDPOINT}/storage/buckets/${STORAGE_BUCKETS.ATTACHMENTS}/files/${fileId}/download?project=${PROJECT_ID}`;
+  };
+
+  const getFileDetails = async (fileId: string): Promise<Attachment | null> => {
+    try {
+      const file = await storage.getFile(STORAGE_BUCKETS.ATTACHMENTS, fileId);
+      const localUri = await getLocalFileUri(file.$id, file.name);
+      return {
+        id: file.$id,
+        name: file.name,
+        type: file.mimeType,
+        size: file.sizeOriginal,
+        url: localUri || getFileViewUrl(file.$id),
+      };
+    } catch (error) {
+      console.error(`Error fetching file details for ${fileId}:`, error);
+      return null;
+    }
+  };
+
+  const getLocalFileUri = async (fileId: string, fileName: string): Promise<string | null> => {
+    try {
+      const dir = documentDirectory || cacheDirectory;
+      const fileUri = `${dir}${fileId}_${fileName}`;
+      const fileInfo = await getInfoAsync(fileUri);
+      
+      if (fileInfo.exists) {
+        return fileInfo.uri;
+      }
+      
+      // Download to local cache
+      const downloadUrl = getFileViewUrl(fileId);
+      const downloadRes = await downloadAsync(downloadUrl, fileUri);
+      return downloadRes.uri;
+    } catch (error) {
+      console.error(`Error downloading file ${fileId} locally:`, error);
+      return null;
+    }
   };
 
   return {
@@ -82,6 +120,8 @@ export function useAttachments() {
     uploadFile,
     getFileViewUrl,
     getFileDownloadUrl,
+    getFileDetails,
+    getLocalFileUri,
     isUploading,
   };
 }

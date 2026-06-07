@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const LOCK_KEY = '@nexus/app_lock_enabled';
 const PIN_KEY = '@nexus/app_lock_pin';
+const BIO_KEY = '@nexus/app_lock_bio_enabled';
 
 interface AppLockState {
   lockEnabled: boolean;
+  biometricEnabled: boolean;
   isLocked: boolean;
   pin: string | null;
 
@@ -13,7 +15,7 @@ interface AppLockState {
   initializeLock: () => Promise<void>;
 
   // Actions
-  enableLock: (pin: string) => Promise<void>;
+  enableLock: (pin: string, useBiometrics: boolean) => Promise<void>;
   disableLock: () => Promise<void>;
   unlock: () => void;
   lock: () => void;
@@ -22,36 +24,45 @@ interface AppLockState {
 
 export const useAppLockStore = create<AppLockState>((set, get) => ({
   lockEnabled: false,
+  biometricEnabled: false,
   isLocked: false,
   pin: null,
 
   initializeLock: async () => {
     try {
-      const [enabled, pin] = await Promise.all([
-        AsyncStorage.getItem(LOCK_KEY),
-        AsyncStorage.getItem(PIN_KEY),
+      const [enabled, pin, bioEnabled] = await Promise.all([
+        SecureStore.getItemAsync(LOCK_KEY),
+        SecureStore.getItemAsync(PIN_KEY),
+        SecureStore.getItemAsync(BIO_KEY),
       ]);
       const lockEnabled = enabled === 'true';
-      set({ lockEnabled, pin, isLocked: lockEnabled });
+      set({ 
+        lockEnabled, 
+        biometricEnabled: bioEnabled === 'true',
+        pin, 
+        isLocked: lockEnabled 
+      });
     } catch {
-      set({ lockEnabled: false, pin: null, isLocked: false });
+      set({ lockEnabled: false, biometricEnabled: false, pin: null, isLocked: false });
     }
   },
 
-  enableLock: async (pin: string) => {
+  enableLock: async (pin: string, useBiometrics: boolean) => {
     await Promise.all([
-      AsyncStorage.setItem(LOCK_KEY, 'true'),
-      AsyncStorage.setItem(PIN_KEY, pin),
+      SecureStore.setItemAsync(LOCK_KEY, 'true'),
+      SecureStore.setItemAsync(PIN_KEY, pin),
+      SecureStore.setItemAsync(BIO_KEY, useBiometrics ? 'true' : 'false'),
     ]);
-    set({ lockEnabled: true, pin, isLocked: false });
+    set({ lockEnabled: true, biometricEnabled: useBiometrics, pin, isLocked: false });
   },
 
   disableLock: async () => {
     await Promise.all([
-      AsyncStorage.removeItem(LOCK_KEY),
-      AsyncStorage.removeItem(PIN_KEY),
+      SecureStore.deleteItemAsync(LOCK_KEY),
+      SecureStore.deleteItemAsync(PIN_KEY),
+      SecureStore.deleteItemAsync(BIO_KEY),
     ]);
-    set({ lockEnabled: false, pin: null, isLocked: false });
+    set({ lockEnabled: false, biometricEnabled: false, pin: null, isLocked: false });
   },
 
   unlock: () => set({ isLocked: false }),

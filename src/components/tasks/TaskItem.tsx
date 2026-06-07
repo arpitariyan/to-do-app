@@ -156,8 +156,12 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
             )}
 
             {task.tags && task.tags.length > 0 && (
-              <View style={[styles.tagBadge, { backgroundColor: colors.bg2 }]}>
-                <Text style={[textStyles.caption, { color: colors.textPrimary, fontSize: 10 }]}>
+              <View style={[styles.tagBadge, { backgroundColor: colors.bg2, flexShrink: 1, maxWidth: 120 }]}>
+                <Text 
+                  style={[textStyles.caption, { color: colors.textPrimary, fontSize: 10 }]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {task.tags[0]} {task.tags.length > 1 ? `+${task.tags.length - 1}` : ''}
                 </Text>
               </View>
@@ -199,6 +203,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   metaItem: {
     flexDirection: 'row',
@@ -219,6 +224,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radii.md,
-    marginLeft: 'auto',
+    flexShrink: 1,
+    maxWidth: '50%',
   },
 });

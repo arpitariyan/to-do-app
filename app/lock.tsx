@@ -26,13 +26,15 @@ const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const;
 
 export default function LockScreen() {
   const { colors } = useTheme();
-  const { verifyPin, unlock } = useAppLockStore();
+  const { verifyPin, unlock, biometricEnabled } = useAppLockStore();
   const { signOut, user } = useAuthStore();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
 
   const shakeX = useSharedValue(0);
-  const shakeStyle = { transform: [{ translateX: shakeX }] };
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }));
 
   const triggerShake = () => {
     Vibration.vibrate(400);
@@ -81,8 +83,10 @@ export default function LockScreen() {
 
   // Attempt biometric on mount
   useEffect(() => {
-    handleBiometric();
-  }, []);
+    if (biometricEnabled) {
+      handleBiometric();
+    }
+  }, [biometricEnabled]);
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => i < pin.length);
 

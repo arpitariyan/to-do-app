@@ -95,15 +95,19 @@ export default function DashboardScreen() {
             <Text style={[textStyles.body, { color: colors.textSecondary }]}>
               {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
-            <Text style={[textStyles.screenTitle, { color: colors.textPrimary }]}>
+            <Text 
+              style={[textStyles.screenTitle, { color: colors.textPrimary, fontSize: 26, lineHeight: 32 }]}
+              numberOfLines={2}
+            >
               {getGreeting()}, {firstName}
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.avatar, { backgroundColor: colors.accentSoft }]}
+            style={[styles.avatar, { backgroundColor: colors.accent, shadowColor: colors.accent, elevation: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }]}
             onPress={() => router.push('/(app)/settings')}
+            activeOpacity={0.8}
           >
-            <Text style={[textStyles.sectionTitle, { color: colors.accent }]}>
+            <Text style={[textStyles.sectionTitle, { color: '#FFFFFF' }]}>
               {firstName.charAt(0).toUpperCase()}
             </Text>
           </TouchableOpacity>
@@ -117,10 +121,14 @@ export default function DashboardScreen() {
           <>
             {/* 2. Productivity Overview */}
             <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.overviewGrid}>
-              <OverviewCard label="Tasks Today" value={todayTasks.length.toString()} icon="checkmark-circle" color={colors.accent} colors={colors} />
-              <OverviewCard label="Upcoming" value={upcomingTasks.length.toString()} icon="calendar" color={colors.info} colors={colors} />
-              <OverviewCard label="Notes" value={notes.length.toString()} icon="document-text" color={colors.success} colors={colors} />
-              <OverviewCard label="Completion" value={`${completionRate}%`} icon="trending-up" color={colors.warning} colors={colors} />
+              <View style={styles.overviewRow}>
+                <OverviewCard label="Tasks Today" value={todayTasks.length.toString()} icon="checkmark-circle" color={colors.accent} colors={colors} />
+                <OverviewCard label="Upcoming" value={upcomingTasks.length.toString()} icon="calendar" color={colors.info} colors={colors} />
+              </View>
+              <View style={styles.overviewRow}>
+                <OverviewCard label="Notes" value={notes.length.toString()} icon="document-text" color={colors.success} colors={colors} />
+                <OverviewCard label="Completion" value={`${completionRate}%`} icon="trending-up" color={colors.warning} colors={colors} />
+              </View>
             </Animated.View>
 
             {/* 4. Today's Focus */}
@@ -200,7 +208,7 @@ export default function DashboardScreen() {
                           {note.title || 'Untitled'}
                         </Text>
                         <Text style={[textStyles.caption, { color: textColor, opacity: 0.7, marginTop: spacing.sm }]} numberOfLines={3}>
-                          {note.content || 'Empty note...'}
+                          {note.content ? note.content.replace(/<[^>]*>?/gm, '').trim() : 'Empty note...'}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -306,12 +314,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing['2xl'],
   },
   headerText: {
+    flex: 1,
+    paddingRight: spacing.lg,
     gap: 4,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.full,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -325,12 +335,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   overviewGrid: {
+    gap: spacing.md,
+  },
+  overviewRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   overviewCard: {
-    width: '48%',
+    flex: 1,
     padding: spacing.md,
     borderRadius: radii.xl,
     borderWidth: 1,

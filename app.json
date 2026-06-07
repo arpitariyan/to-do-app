@@ -15,11 +15,23 @@
         "backgroundColor": "#0D0F14",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "package": "com.personal.nexus"
+      "package": "com.personal.nexus",
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#8B5CF6"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

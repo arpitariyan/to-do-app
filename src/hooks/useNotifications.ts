@@ -112,3 +112,36 @@ export async function cancelTaskReminder(taskId: string) {
     await Notifications.cancelScheduledNotificationAsync(n.identifier);
   }
 }
+
+export async function syncTaskReminders(tasks: any[]) {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduledTaskIds = scheduled.map(n => n.content.data?.taskId);
+
+  for (const task of tasks) {
+    if (task.dueAt && task.reminders && task.reminders.length > 0 && task.status !== 'done') {
+      const minutesToSubtract = parseInt(task.reminders[0], 10);
+      if (!isNaN(minutesToSubtract)) {
+        const triggerTime = new Date(task.dueAt);
+        triggerTime.setMinutes(triggerTime.getMinutes() - minutesToSubtract);
+        
+        if (triggerTime.getTime() > Date.now()) {
+          // If not already scheduled, schedule it
+          if (!scheduledTaskIds.includes(task.$id)) {
+            await scheduleTaskReminder(
+              task.$id,
+              task.title,
+              task.description || '',
+              triggerTime,
+              task.repeatType
+            );
+          }
+        }
+      }
+    } else {
+      // If done or no reminder, cancel if exists
+      if (scheduledTaskIds.includes(task.$id)) {
+        await cancelTaskReminder(task.$id);
+      }
+    }
+  }
+}

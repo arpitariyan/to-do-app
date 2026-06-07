@@ -51,10 +51,10 @@ export function Checkbox({ checked, onToggle, size = 24 }: CheckboxProps) {
     };
   });
 
-  const checkStyle = {
-    opacity: progress,
-    transform: [{ scale: progress }],
-  };
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: progress.value }],
+  }));
 
   return (
     <TouchableOpacity

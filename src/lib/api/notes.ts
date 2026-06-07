@@ -8,6 +8,10 @@ export interface Note {
   content?: string;
   folderId?: string;
   isFavorite: boolean;
+  pinned: boolean;
+  tags?: string[];
+  color?: string;
+  attachments?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -17,6 +21,10 @@ export interface CreateNotePayload {
   content?: string;
   folderId?: string;
   isFavorite?: boolean;
+  pinned?: boolean;
+  tags?: string[];
+  color?: string;
+  attachments?: string[];
 }
 
 export interface UpdateNotePayload extends Partial<CreateNotePayload> {}
@@ -66,6 +74,10 @@ export async function createNote(payload: CreateNotePayload) {
     content: payload.content || '',
     folderId: payload.folderId || null,
     isFavorite: payload.isFavorite || false,
+    pinned: payload.pinned || false,
+    tags: payload.tags || [],
+    color: payload.color || null,
+    attachments: payload.attachments || [],
     createdAt: now,
     updatedAt: now,
   };
@@ -91,6 +103,10 @@ export async function updateNote(id: string, payload: UpdateNotePayload) {
   if (payload.content !== undefined) data.content = payload.content;
   if (payload.folderId !== undefined) data.folderId = payload.folderId;
   if (payload.isFavorite !== undefined) data.isFavorite = payload.isFavorite;
+  if (payload.pinned !== undefined) data.pinned = payload.pinned;
+  if (payload.tags !== undefined) data.tags = payload.tags;
+  if (payload.color !== undefined) data.color = payload.color;
+  if (payload.attachments !== undefined) data.attachments = payload.attachments;
 
   const response = await databases.updateDocument(
     DB_ID,

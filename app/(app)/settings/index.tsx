@@ -11,6 +11,11 @@ import {
   TextInput,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
+import { getTasks, createTask } from '@/src/lib/api/tasks';
+import { getNotes, createNote } from '@/src/lib/api/notes';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -160,6 +165,55 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const handleBackup = async () => {
+    try {
+      const tasks = await getTasks();
+      const notes = await getNotes();
+      const backupData = JSON.stringify({ tasks, notes }, null, 2);
+      // @ts-ignore
+      const fileUri = (FileSystem.documentDirectory || FileSystem.cacheDirectory) + 'nexus_backup.json';
+      await FileSystem.writeAsStringAsync(fileUri, backupData);
+      
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (isSharingAvailable) {
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Backup to Google Drive' });
+      } else {
+        Alert.alert('Error', 'Sharing is not available on this device');
+      }
+    } catch (e) {
+      Alert.alert('Backup Failed', String(e));
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
+      if (result.canceled) return;
+      
+      const fileUri = result.assets[0].uri;
+      const fileContent = await FileSystem.readAsStringAsync(fileUri);
+      const backupData = JSON.parse(fileContent);
+      
+      let restoredCount = 0;
+      if (backupData.tasks && Array.isArray(backupData.tasks)) {
+        for (const t of backupData.tasks) {
+          await createTask({ title: t.title, description: t.description, status: t.status, priority: t.priority, dueAt: t.dueAt, taskType: t.taskType, repeatType: t.repeatType, startTime: t.startTime }).catch(()=>null);
+          restoredCount++;
+        }
+      }
+      if (backupData.notes && Array.isArray(backupData.notes)) {
+        for (const n of backupData.notes) {
+          await createNote({ title: n.title, content: n.content, attachments: n.attachments }).catch(()=>null);
+          restoredCount++;
+        }
+      }
+      
+      Alert.alert('Success', `Restored ${restoredCount} items successfully!`);
+    } catch (e) {
+      Alert.alert('Restore Failed', 'Invalid backup file or network error.');
+    }
+  };
+
   const themeOptions: { label: string; value: typeof mode }[] = [
     { label: 'System', value: 'system' },
     { label: 'Dark', value: 'dark' },
@@ -275,17 +329,8 @@ export default function SettingsScreen() {
         {/* Data */}
         <Animated.View entering={FadeInDown.delay(320).duration(500)}>
           <Section title="Data">
-            <SettingsRow icon="cloud-upload-outline" label="Backup & Export" value="Coming in Phase 5" onPress={() => {}} />
-            <SettingsRow icon="cloud-download-outline" label="Import / Restore" value="Coming in Phase 5" onPress={() => {}} />
-            <SettingsRow icon="trash-outline" label="Archive & Trash" value="Coming in Phase 5" onPress={() => {}} />
-          </Section>
-        </Animated.View>
-
-        {/* AI */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-          <Section title="AI Assistant">
-            <SettingsRow icon="sparkles-outline" label="AI Mode" value="Assist (default)" onPress={() => {}} />
-            <SettingsRow icon="toggle-outline" label="Auto-apply Rules" value="Coming in Phase 5" onPress={() => {}} />
+            <SettingsRow icon="cloud-upload-outline" label="Backup & Export" value="Save to Google Drive" onPress={handleBackup} />
+            <SettingsRow icon="cloud-download-outline" label="Import / Restore" value="Load from Google Drive" onPress={handleRestore} />
           </Section>
         </Animated.View>
 
@@ -310,7 +355,7 @@ export default function SettingsScreen() {
       <PinSetupModal
         visible={pinModalVisible}
         onClose={() => setPinModalVisible(false)}
-        onConfirm={(pin) => { enableLock(pin); setPinModalVisible(false); }}
+        onConfirm={(pin) => { enableLock(pin, true); setPinModalVisible(false); }}
       />
     </Screen>
   );

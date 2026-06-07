@@ -36,6 +36,8 @@ export const COLLECTIONS = {
   REMINDERS: 'reminders',
   AI_ACTIVITY_LOG: 'ai_activity_log',
   APP_SETTINGS: 'app_settings',
+  AI_CONVERSATIONS: 'ai_conversations',
+  AI_MESSAGES: 'ai_messages',
 } as const;
 
 export const STORAGE_BUCKETS = {

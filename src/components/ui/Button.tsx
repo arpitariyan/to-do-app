@@ -60,13 +60,17 @@ export function Button({
 
   const isDisabled = disabled || loading;
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   const containerStyles = [
     styles.base,
     sizeStyles[size],
     getVariantStyle(variant, colors),
     fullWidth && styles.fullWidth,
     isDisabled && styles.disabled,
-    { transform: [{ scale }] },
+    animatedStyle,
     style,
   ];
 

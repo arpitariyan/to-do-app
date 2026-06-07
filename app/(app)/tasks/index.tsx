@@ -9,6 +9,7 @@ import { textStyles } from '@/src/theme/typography';
 import { Screen } from '@/src/components/layout/Screen';
 import { TaskItem } from '@/src/components/tasks/TaskItem';
 import { useTasks, useUpdateTask } from '@/src/hooks/useTasks';
+import { syncTaskReminders } from '@/src/hooks/useNotifications';
 
 type FilterType = 'today' | 'upcoming' | 'completed';
 
@@ -21,6 +22,12 @@ export default function TasksScreen() {
   
   const { data: tasks = [], isLoading, error } = useTasks({ archived: false });
   const updateTask = useUpdateTask();
+
+  React.useEffect(() => {
+    if (tasks.length > 0) {
+      syncTaskReminders(tasks);
+    }
+  }, [tasks]);
 
   const handleToggleTask = (id: string, newStatus: 'todo' | 'done') => {
     updateTask.mutate({ id, payload: { status: newStatus } });

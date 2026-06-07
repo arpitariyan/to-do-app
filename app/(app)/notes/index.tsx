@@ -31,11 +31,16 @@ export default function NotesScreen() {
     );
   }, [notes, searchQuery]);
 
-  // Split notes into two columns for pseudo-masonry layout
+  const pinnedNotes = useMemo(() => {
+    return filteredNotes.filter(n => n.pinned);
+  }, [filteredNotes]);
+
+  // Split unpinned notes into two columns for pseudo-masonry layout
   const { leftCol, rightCol } = useMemo(() => {
+    const unpinned = filteredNotes.filter(n => !n.pinned);
     const left: typeof filteredNotes = [];
     const right: typeof filteredNotes = [];
-    filteredNotes.forEach((note, index) => {
+    unpinned.forEach((note, index) => {
       if (index % 2 === 0) left.push(note);
       else right.push(note);
     });
@@ -85,13 +90,43 @@ export default function NotesScreen() {
         </Animated.View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {pinnedNotes.length > 0 && (
+            <View style={styles.pinnedSection}>
+              <Text style={[textStyles.labelLg, { color: colors.textSecondary, marginBottom: spacing.md }]}>
+                Pinned
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
+                {pinnedNotes.map((note) => (
+                  <TouchableOpacity
+                    key={note.$id}
+                    style={[styles.noteCard, { backgroundColor: colors.bg3, width: 200 }]}
+                    activeOpacity={0.8}
+                    onPress={() => handleNotePress(note.$id)}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Text style={[textStyles.cardTitle, { color: colors.textPrimary, flex: 1 }]} numberOfLines={2}>
+                        {note.title || 'Untitled'}
+                      </Text>
+                      <Ionicons name="pin" size={16} color={colors.accent} style={{ marginLeft: spacing.xs }} />
+                    </View>
+                    {note.content ? (
+                      <Text style={[textStyles.body, { color: colors.textSecondary, marginTop: spacing.sm }]} numberOfLines={3}>
+                        {note.content.replace(/<[^>]*>?/gm, '').trim()}
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           <View style={styles.masonryContainer}>
             {/* Left Column */}
             <View style={styles.column}>
               {leftCol.map((note, index) => {
                 const pastelColors = ['#F3E8FF', '#D1FAE5', '#E0F2FE', '#FFEDD5']; 
                 const darkColors = ['#4C1D95', '#064E3B', '#0C4A6E', '#7C2D12'];
-                const bg = colors.bg1 === '#FFFFFF' ? pastelColors[(index * 2) % 4] : darkColors[(index * 2) % 4];
+                const bg = note.color || (colors.bg1 === '#FFFFFF' ? pastelColors[(index * 2) % 4] : darkColors[(index * 2) % 4]);
                 const textColor = colors.bg1 === '#FFFFFF' ? '#18181B' : '#F8FAFC';
 
                 return (
@@ -106,12 +141,17 @@ export default function NotesScreen() {
                       </Text>
                       {note.content ? (
                         <Text style={[textStyles.body, { color: textColor, opacity: 0.8, marginTop: spacing.sm }]} numberOfLines={6}>
-                          {note.content}
+                          {note.content.replace(/<[^>]*>?/gm, '').trim()}
                         </Text>
                       ) : null}
-                      <Text style={[textStyles.caption, { color: textColor, opacity: 0.6, marginTop: spacing.md }]}>
-                        {new Date(note.updatedAt).toLocaleDateString()}
-                      </Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
+                        <Text style={[textStyles.caption, { color: textColor, opacity: 0.6 }]}>
+                          {new Date(note.updatedAt).toLocaleDateString()}
+                        </Text>
+                        {note.attachments && note.attachments.length > 0 && (
+                          <Ionicons name="attach" size={16} color={textColor} style={{ opacity: 0.6 }} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   </Animated.View>
                 );
@@ -123,7 +163,7 @@ export default function NotesScreen() {
               {rightCol.map((note, index) => {
                 const pastelColors = ['#F3E8FF', '#D1FAE5', '#E0F2FE', '#FFEDD5']; 
                 const darkColors = ['#4C1D95', '#064E3B', '#0C4A6E', '#7C2D12'];
-                const bg = colors.bg1 === '#FFFFFF' ? pastelColors[(index * 2 + 1) % 4] : darkColors[(index * 2 + 1) % 4];
+                const bg = note.color || (colors.bg1 === '#FFFFFF' ? pastelColors[(index * 2 + 1) % 4] : darkColors[(index * 2 + 1) % 4]);
                 const textColor = colors.bg1 === '#FFFFFF' ? '#18181B' : '#F8FAFC';
 
                 return (
@@ -138,12 +178,17 @@ export default function NotesScreen() {
                       </Text>
                       {note.content ? (
                         <Text style={[textStyles.body, { color: textColor, opacity: 0.8, marginTop: spacing.sm }]} numberOfLines={6}>
-                          {note.content}
+                          {note.content.replace(/<[^>]*>?/gm, '').trim()}
                         </Text>
                       ) : null}
-                      <Text style={[textStyles.caption, { color: textColor, opacity: 0.6, marginTop: spacing.md }]}>
-                        {new Date(note.updatedAt).toLocaleDateString()}
-                      </Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>
+                        <Text style={[textStyles.caption, { color: textColor, opacity: 0.6 }]}>
+                          {new Date(note.updatedAt).toLocaleDateString()}
+                        </Text>
+                        {note.attachments && note.attachments.length > 0 && (
+                          <Ionicons name="attach" size={16} color={textColor} style={{ opacity: 0.6 }} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   </Animated.View>
                 );
@@ -214,6 +259,9 @@ const styles = StyleSheet.create({
   masonryContainer: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  pinnedSection: {
+    marginBottom: spacing.xl,
   },
   column: {
     flex: 1,
