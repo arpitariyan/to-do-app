@@ -67,7 +67,7 @@ export default function LoginScreen() {
             Welcome back
           </Text>
           <Text style={[textStyles.bodyMd, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-            Sign in to your Nexus workspace
+            Sign in to your Astra workspace
           </Text>
         </Animated.View>
 

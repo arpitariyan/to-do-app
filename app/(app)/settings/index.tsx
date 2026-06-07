@@ -348,7 +348,7 @@ export default function SettingsScreen() {
 
         {/* Version */}
         <Animated.View entering={FadeInDown.delay(560).duration(500)} style={styles.version}>
-          <Text style={[textStyles.caption, { color: colors.textMuted }]}>Nexus v1.0.0 · Phase 1 · Private build</Text>
+          <Text style={[textStyles.caption, { color: colors.textMuted }]}>Astra v1.0.0 · Phase 1 · Private build</Text>
         </Animated.View>
       </ScrollView>
 

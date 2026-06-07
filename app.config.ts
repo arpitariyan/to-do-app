@@ -2,15 +2,15 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Nexus',
-  slug: 'nexus-productivity',
+  name: 'Astra',
+  slug: 'astra-productivity',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: './assets/app-logo.jpeg',
   userInterfaceStyle: 'automatic',
   android: {
     adaptiveIcon: {
-      foregroundImage: './assets/android-icon-foreground.png',
+      foregroundImage: './assets/app-logo.jpeg',
       backgroundColor: '#0D0F14',
     },
     package: 'com.personal.nexus',
@@ -42,15 +42,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-local-authentication',
       {
-        faceIDPermission: 'Allow Nexus to use Face ID for app lock.',
+        faceIDPermission: 'Allow Astra to use Face ID for app lock.',
       },
     ],
     'expo-notifications',
     [
       'expo-image-picker',
       {
-        photosPermission: 'Allow Nexus to access your photos for attachments.',
-        cameraPermission: 'Allow Nexus to use your camera for attachments.',
+        photosPermission: 'Allow Astra to access your photos for attachments.',
+        cameraPermission: 'Allow Astra to use your camera for attachments.',
       },
     ],
     [
@@ -62,7 +62,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-av',
       {
-        microphonePermission: 'Allow Nexus to record voice notes.',
+        microphonePermission: 'Allow Astra to record voice notes.',
       },
     ],
   ],

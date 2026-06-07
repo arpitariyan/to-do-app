@@ -72,7 +72,7 @@ export default function LockScreen() {
   const handleBiometric = async () => {
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock Nexus',
+        promptMessage: 'Unlock Astra',
         fallbackLabel: 'Use PIN',
       });
       if (result.success) unlock();
@@ -99,7 +99,7 @@ export default function LockScreen() {
         </View>
 
         <Text style={[textStyles.headingMd, { color: colors.textPrimary, marginTop: spacing.lg }]}>
-          Nexus is locked
+          Astra is locked
         </Text>
         <Text style={[textStyles.bodyMd, { color: colors.textSecondary, marginTop: spacing.xs }]}>
           {user?.name ?? 'Enter your PIN to continue'}

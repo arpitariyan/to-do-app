@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Nexus",
-    "slug": "nexus-productivity",
+    "name": "Astra",
+    "slug": "astra-productivity",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-logo.jpeg",
     "scheme": "nexus",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,7 +13,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0D0F14",
-        "foregroundImage": "./assets/android-icon-foreground.png"
+        "foregroundImage": "./assets/app-logo.jpeg"
       },
       "package": "com.personal.nexus",
       "permissions": [
@@ -28,7 +28,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/app-logo.jpeg",
           "color": "#8B5CF6"
         }
       ]
