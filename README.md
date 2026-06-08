@@ -4,16 +4,6 @@
 
 Astra is a modern, AI-powered productivity application designed to seamlessly manage tasks, notes, and daily schedules. Built with React Native and Expo, and backed by Appwrite, Astra delivers a dynamic, responsive, and aesthetically stunning interface tailored for Android devices.
 
-## 📸 Screenshots
-
-<p align="center">
-  <img src="./assets/screenshots/screenshot1.jpg" width="30%" />
-  <img src="./assets/screenshots/screenshot2.jpg" width="30%" />
-  <img src="./assets/screenshots/screenshot3.jpg" width="30%" />
-</p>
-
-*(Note: Replace the placeholders in `assets/screenshots` with actual screenshots of your app!)*
-
 ## ✨ Features
 
 - **Dynamic Task Management:** Create, track, and complete tasks with an intuitive interface.

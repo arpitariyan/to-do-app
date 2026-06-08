@@ -65,6 +65,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         microphonePermission: 'Allow Astra to record voice notes.',
       },
     ],
+    [
+      'expo-build-properties',
+      {
+        android: {
+          minSdkVersion: 30,
+        },
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
