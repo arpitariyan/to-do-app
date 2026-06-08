@@ -1,6 +1,6 @@
 import '@/src/lib/suppressWarnings';
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -28,24 +28,34 @@ function AppNavigator() {
   const { initializeLock, lockEnabled, isLocked } = useAppLockStore();
   useNotifications(); // Initialize notification listeners globally
 
+  const segments = useSegments();
+  const router = useRouter();
+
   useEffect(() => {
     Promise.all([initialize(), initializeLock()]);
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+    const isLockScreen = segments[0] === 'lock';
+
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace('/(auth)/login');
+    } else if (isAuthenticated && isLocked && !isLockScreen) {
+      router.replace('/lock');
+    } else if (isAuthenticated && !isLocked && inAuthGroup) {
+      router.replace('/(app)');
+    }
+  }, [isAuthenticated, authLoading, segments, isLocked]);
 
   if (authLoading) return null;
 
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-        {!isAuthenticated ? (
-          <Stack.Screen name="(auth)" />
-        ) : isLocked ? (
-          <Stack.Screen name="lock" />
-        ) : (
-          <Stack.Screen name="(app)" />
-        )}
-      </Stack>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />
     </>
   );
 }
