@@ -4,11 +4,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Astra',
   slug: 'astra-productivity',
-  version: '1.1.0',
+  version: '1.2.0',
   orientation: 'portrait',
   icon: './assets/app-logo.jpeg',
   userInterfaceStyle: 'automatic',
+  jsEngine: 'hermes',
   android: {
+    softwareKeyboardLayoutMode: 'pan',
     adaptiveIcon: {
       foregroundImage: './assets/app-logo.jpeg',
       backgroundColor: '#0D0F14',
@@ -84,6 +86,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           minSdkVersion: 24,
           compileSdkVersion: 35,
           targetSdkVersion: 35,
+          enableProguardInReleaseBuilds: true,
         },
       },
     ],

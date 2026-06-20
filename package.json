@@ -1,7 +1,7 @@
 {
-  "name": "to-do-app",
-  "version": "1.0.0",
-  "main": "index.ts",
+  "name": "astra-productivity",
+  "version": "1.2.0",
+  "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/vector-icons": "^15.1.1",
