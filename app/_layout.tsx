@@ -16,7 +16,8 @@ import {
 import { ThemeProvider, useTheme } from '@/src/theme/ThemeContext';
 import { useAuthStore } from '@/src/stores/authStore';
 import { useAppLockStore } from '@/src/stores/appLockStore';
-import { useNotifications } from '@/src/hooks/useNotifications';
+import { useNotifications, syncTaskReminders } from '@/src/hooks/useNotifications';
+import { getTasks } from '@/src/lib/api/tasks';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,20 @@ function AppNavigator() {
     Promise.all([initialize(), initializeLock()]);
   }, []);
 
+  // Sync task reminders on startup so notifications survive phone restarts
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const syncReminders = async () => {
+      try {
+        const tasks = await getTasks({ archived: false });
+        await syncTaskReminders(tasks);
+      } catch (e) {
+        // Silent fail — no internet or not authenticated yet
+      }
+    };
+    syncReminders();
+  }, [isAuthenticated]);
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -45,7 +60,7 @@ function AppNavigator() {
       router.replace('/(auth)/login');
     } else if (isAuthenticated && isLocked && !isLockScreen) {
       router.replace('/lock');
-    } else if (isAuthenticated && !isLocked && inAuthGroup) {
+    } else if (isAuthenticated && !isLocked && (inAuthGroup || isLockScreen)) {
       router.replace('/(app)');
     }
   }, [isAuthenticated, authLoading, segments, isLocked]);

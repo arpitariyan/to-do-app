@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Astra',
   slug: 'astra-productivity',
-  version: '1.0.0',
+  version: '1.1.0',
   orientation: 'portrait',
   icon: './assets/app-logo.jpeg',
   userInterfaceStyle: 'automatic',
@@ -23,6 +23,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'WRITE_EXTERNAL_STORAGE',
       'CAMERA',
       'RECORD_AUDIO',
+      'SCHEDULE_EXACT_ALARM',
+      'USE_EXACT_ALARM',
+      'POST_NOTIFICATIONS',
     ],
   },
   scheme: 'nexus',
@@ -45,7 +48,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         faceIDPermission: 'Allow Astra to use Face ID for app lock.',
       },
     ],
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/app-logo.jpeg',
+        color: '#7C3AED',
+        androidMode: 'default',
+        androidCollapsedTitle: 'Astra Task Reminders',
+        iosDisplayInForeground: true,
+      },
+    ],
     [
       'expo-image-picker',
       {
@@ -69,7 +81,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-build-properties',
       {
         android: {
-          minSdkVersion: 30,
+          minSdkVersion: 24,
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
         },
       },
     ],

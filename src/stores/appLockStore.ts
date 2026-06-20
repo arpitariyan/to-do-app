@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 
-const LOCK_KEY = '@nexus/app_lock_enabled';
-const PIN_KEY = '@nexus/app_lock_pin';
-const BIO_KEY = '@nexus/app_lock_bio_enabled';
+const LOCK_KEY = 'nexus.app_lock_enabled';
+const PIN_KEY = 'nexus.app_lock_pin';
+const BIO_KEY = 'nexus.app_lock_bio_enabled';
 
 interface AppLockState {
   lockEnabled: boolean;
@@ -16,6 +16,7 @@ interface AppLockState {
 
   // Actions
   enableLock: (pin: string, useBiometrics: boolean) => Promise<void>;
+  toggleBiometrics: (useBiometrics: boolean) => Promise<void>;
   disableLock: () => Promise<void>;
   unlock: () => void;
   lock: () => void;
@@ -54,6 +55,11 @@ export const useAppLockStore = create<AppLockState>((set, get) => ({
       SecureStore.setItemAsync(BIO_KEY, useBiometrics ? 'true' : 'false'),
     ]);
     set({ lockEnabled: true, biometricEnabled: useBiometrics, pin, isLocked: false });
+  },
+
+  toggleBiometrics: async (useBiometrics: boolean) => {
+    await SecureStore.setItemAsync(BIO_KEY, useBiometrics ? 'true' : 'false');
+    set({ biometricEnabled: useBiometrics });
   },
 
   disableLock: async () => {

@@ -1,14 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
-  Alert, Clipboard, KeyboardAvoidingView, Platform,
-  ActivityIndicator,
+  Clipboard, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Dimensions, TextInput, ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming,
+} from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { spacing, radii } from '@/src/theme/tokens';
 import { textStyles } from '@/src/theme/typography';
+import { GlassCard } from '@/src/components/ui/GlassCard';
 
 import {
   AIConversation, AIMessage,
@@ -26,17 +31,19 @@ import { deleteMessage } from '@/src/lib/api/aiChat';
 const SUGGESTIONS = [
   { icon: 'add-circle-outline', text: 'Create a daily workout task at 7 AM', color: '#22C55E' },
   { icon: 'checkmark-circle-outline', text: 'Mark my reading task as done', color: '#3B82F6' },
-  { icon: 'document-outline', text: 'Create a note about React hooks', color: '#F59E0B' },
+  { icon: 'document-text-outline', text: 'Create a note about React hooks', color: '#F59E0B' },
   { icon: 'list-outline', text: 'Show me all my tasks', color: '#8B5CF6' },
   { icon: 'calendar-outline', text: 'What tasks do I have this week?', color: '#EC4899' },
   { icon: 'pencil-outline', text: 'Summarize my latest note', color: '#14B8A6' },
 ];
 
 // ─── Sidebar / Conversation History ──────────────────────────────────────────
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SIDEBAR_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 320);
 
 function ConversationSidebar({
   visible, onClose, conversations, activeId,
-  onSelect, onNew, onDelete, onPin, onRename,
+  onSelect, onNew, onActionMenu
 }: {
   visible: boolean;
   onClose: () => void;
@@ -44,76 +51,157 @@ function ConversationSidebar({
   activeId: string | null;
   onSelect: (conv: AIConversation) => void;
   onNew: () => void;
-  onDelete: (id: string) => void;
-  onPin: (id: string, pinned: boolean) => void;
-  onRename: (id: string, title: string) => void;
+  onActionMenu: (conv: AIConversation) => void;
 }) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const translateX = useSharedValue(-SIDEBAR_WIDTH);
+  const overlayOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      overlayOpacity.value = withTiming(1, { duration: 220 });
+      translateX.value = withTiming(0, { duration: 260 });
+    } else {
+      overlayOpacity.value = withTiming(0, { duration: 180 });
+      translateX.value = withTiming(-SIDEBAR_WIDTH, { duration: 220 });
+    }
+  }, [visible]);
+
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: overlayOpacity.value }));
+  const drawerStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+
+  // Sort pinned first, then by date
+  const sortedConvs = [...conversations].sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return 0;
+  });
+
+  const pinnedConvs = sortedConvs.filter(c => c.pinned);
+  const otherConvs = sortedConvs.filter(c => !c.pinned);
+
+  if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.sidebarOverlay}>
-        <TouchableOpacity style={styles.sidebarDismiss} onPress={onClose} activeOpacity={1} />
-        <View style={[styles.sidebar, { backgroundColor: colors.bg1 }]}>
-          {/* Sidebar header */}
-          <SafeAreaView edges={['top'] as any}>
-            <View style={[styles.sidebarHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[textStyles.labelLg, { color: colors.textPrimary }]}>Conversations</Text>
-              <TouchableOpacity
-                style={[styles.newChatBtn, { backgroundColor: '#7C3AED' }]}
-                onPress={() => { onNew(); onClose(); }}
-              >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={styles.newChatText}>New</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
+      {/* Overlay */}
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)' }, overlayStyle]}>
+        {/* Dismiss area (right side) */}
+        <TouchableOpacity
+          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: SCREEN_WIDTH - SIDEBAR_WIDTH }}
+          onPress={onClose}
+          activeOpacity={1}
+        />
+      </Animated.View>
 
-          <FlatList
-            data={conversations}
-            keyExtractor={(c) => c.$id}
-            contentContainerStyle={{ paddingVertical: spacing.sm }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.convItem,
-                  item.$id === activeId && { backgroundColor: colors.bg2 },
-                ]}
-                onPress={() => { onSelect(item); onClose(); }}
-                onLongPress={() =>
-                  Alert.alert(item.title, 'What would you like to do?', [
-                    { text: item.pinned ? 'Unpin' : 'Pin', onPress: () => onPin(item.$id, !item.pinned) },
-                    {
-                      text: 'Rename', onPress: () => {
-                        Alert.prompt?.('Rename', '', (t) => t && onRename(item.$id, t), 'plain-text', item.title);
-                      }
-                    },
-                    { text: 'Delete', style: 'destructive', onPress: () => onDelete(item.$id) },
-                    { text: 'Cancel', style: 'cancel' },
-                  ])
-                }
-              >
-                <View style={styles.convIcon}>
-                  {item.pinned
-                    ? <Ionicons name="pin" size={14} color="#7C3AED" />
-                    : <Ionicons name="chatbubble-outline" size={14} color={colors.textMuted} />
-                  }
-                </View>
-                <Text
-                  style={[styles.convTitle, { color: item.$id === activeId ? '#7C3AED' : colors.textPrimary }]}
-                  numberOfLines={1}
-                >
-                  {item.title}
-                </Text>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <Text style={[styles.empty, { color: colors.textMuted }]}>No conversations yet</Text>
-            }
-          />
+      {/* Drawer */}
+      <Animated.View style={[styles.drawer, drawerStyle]}>
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} experimentalBlurMethod="dimezisBlurView" />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glassSoft }]} />
+        
+        {/* Header */}
+        <View style={[styles.drawerHeader, { paddingTop: insets.top + 12, borderBottomColor: colors.glassBorder }]}>
+          <View style={styles.drawerHeaderLeft}>
+            <View style={[styles.drawerLogo, { backgroundColor: colors.accentSoft }]}>
+              <Ionicons name="sparkles" size={16} color={colors.accent} />
+            </View>
+            <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Conversations</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.newChatFab, { backgroundColor: colors.accent }]}
+            onPress={() => { onNew(); onClose(); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.newChatFabText}>New</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+        >
+          {pinnedConvs.length > 0 && (
+            <>
+              <Text style={[styles.drawerSectionLabel, { color: colors.textMuted }]}>📌 PINNED</Text>
+              {pinnedConvs.map(item => (
+                <ConvRow
+                  key={item.$id}
+                  item={item}
+                  activeId={activeId}
+                  colors={colors}
+                  onSelect={() => { onSelect(item); onClose(); }}
+                  onLongPress={() => { onClose(); setTimeout(() => onActionMenu(item), 300); }}
+                />
+              ))}
+            </>
+          )}
+
+          {otherConvs.length > 0 && (
+            <>
+              {pinnedConvs.length > 0 && (
+                <Text style={[styles.drawerSectionLabel, { color: colors.textMuted }]}>💬 RECENT</Text>
+              )}
+              {otherConvs.map(item => (
+                <ConvRow
+                  key={item.$id}
+                  item={item}
+                  activeId={activeId}
+                  colors={colors}
+                  onSelect={() => { onSelect(item); onClose(); }}
+                  onLongPress={() => { onClose(); setTimeout(() => onActionMenu(item), 300); }}
+                />
+              ))}
+            </>
+          )}
+
+          {conversations.length === 0 && (
+            <View style={styles.emptyDrawer}>
+              <Ionicons name="chatbubbles-outline" size={40} color={colors.textMuted} />
+              <Text style={[styles.emptyDrawerText, { color: colors.textMuted }]}>No conversations yet</Text>
+              <Text style={[styles.emptyDrawerSub, { color: colors.textMuted }]}>Start a new chat to begin</Text>
+            </View>
+          )}
+        </ScrollView>
+      </Animated.View>
     </Modal>
+  );
+}
+
+function ConvRow({ item, activeId, colors, onSelect, onLongPress }: {
+  item: AIConversation;
+  activeId: string | null;
+  colors: any;
+  onSelect: () => void;
+  onLongPress: () => void;
+}) {
+  const isActive = item.$id === activeId;
+  return (
+    <TouchableOpacity
+      style={[styles.convRow, isActive && { backgroundColor: colors.accentSoft }]}
+      onPress={onSelect}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.convRowIcon, { backgroundColor: isActive ? colors.accentSoft : colors.bg2 }]}>
+        <Ionicons
+          name={item.pinned ? 'pin' : 'chatbubble-outline'}
+          size={14}
+          color={isActive ? colors.accent : colors.textMuted}
+        />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[styles.convRowTitle, { color: isActive ? colors.accent : colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {item.title}
+        </Text>
+      </View>
+      <Ionicons name="ellipsis-horizontal" size={16} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
@@ -121,6 +209,7 @@ function ConversationSidebar({
 
 export default function AIScreen() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
 
   const [conversations, setConversations] = useState<AIConversation[]>([]);
@@ -130,6 +219,17 @@ export default function AIScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoadingConvs, setIsLoadingConvs] = useState(true);
+
+  // Bottom Sheet Action Menu state
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [actionMenuConv, setActionMenuConv] = useState<AIConversation | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameText, setRenameText] = useState('');
+  const [showToast, setShowToast] = useState<string | null>(null);
+
+  // Delete confirm bottom sheet
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   // Conversation history for Groq context
   const historyRef = useRef<{ role: 'user' | 'assistant'; content: string }[]>([]);
@@ -144,7 +244,6 @@ export default function AIScreen() {
     try {
       const convs = await getConversations();
       setConversations(convs);
-      // Auto-load most recent conversation if exists
       if (convs.length > 0 && !activeConv) {
         await loadConversation(convs[0]);
       }
@@ -161,7 +260,6 @@ export default function AIScreen() {
     try {
       const msgs = await getMessages(conv.$id);
       setMessages(msgs);
-      // Rebuild history ref
       historyRef.current = msgs.map((m) => ({ role: m.role, content: m.content }));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
     } catch (e) {
@@ -194,19 +292,14 @@ export default function AIScreen() {
     let conv = activeConv;
     if (!conv) {
       await startNewConversation(text);
-      // activeConv state update is async, re-read from closure won't work
-      // so we'll get the newest conv from state update
-      conv = null; // will be caught below
+      conv = null;
     }
 
-    // Re-check after potential async state update
     if (!conv) {
-      // Try again after React re-render
       setTimeout(() => handleSend(), 200);
       return;
     }
 
-    // Save user message
     const userMsgData = await saveMessage({ conversationId: conv.$id, role: 'user', content: text }).catch(() => null);
     if (userMsgData) {
       setMessages((prev) => [...prev, userMsgData]);
@@ -218,7 +311,6 @@ export default function AIScreen() {
 
     try {
       const result = await processMessage(text, historyRef.current.slice(-12));
-
       const aiContent = result.reply;
       const aiMsgData = await saveMessage({
         conversationId: conv.$id,
@@ -248,7 +340,6 @@ export default function AIScreen() {
       prevActiveConvRef.current = activeConv;
       const pending = pendingSendRef.current;
       pendingSendRef.current = null;
-      // Trigger send with current conv
       (async () => {
         const userMsgData = await saveMessage({ conversationId: activeConv.$id, role: 'user', content: pending }).catch(() => null);
         if (userMsgData) {
@@ -292,7 +383,6 @@ export default function AIScreen() {
       }
       return;
     }
-    // Has active conv — send directly
     const userMsgData = await saveMessage({ conversationId: conv.$id, role: 'user', content: text }).catch(() => null);
     if (userMsgData) {
       setMessages((prev) => [...prev, userMsgData]);
@@ -318,34 +408,48 @@ export default function AIScreen() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  // ── Delete conversation ────────────────────────────────────────────────────
-  const handleDeleteConv = async (id: string) => {
-    Alert.alert('Delete Chat', 'This will delete all messages in this conversation.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          await deleteConversation(id).catch(() => { });
-          setConversations((prev) => prev.filter((c) => c.$id !== id));
-          if (activeConv?.$id === id) {
-            setActiveConv(null);
-            setMessages([]);
-            historyRef.current = [];
-          }
-        },
-      },
-    ]);
+  // ── Delete conversation (with bottom sheet confirm) ────────────────────────
+  const handleDeleteConvRequest = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteConfirmVisible(true);
+  };
+
+  const handleDeleteConvConfirm = async () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteConfirmVisible(false);
+    setDeleteTargetId(null);
+    await deleteConversation(id).catch(() => { });
+    setConversations((prev) => prev.filter((c) => c.$id !== id));
+    if (activeConv?.$id === id) {
+      setActiveConv(null);
+      setMessages([]);
+      historyRef.current = [];
+    }
+    toast('Conversation deleted');
   };
 
   const handlePin = async (id: string, pinned: boolean) => {
     await pinConversation(id, pinned).catch(() => { });
     setConversations((prev) => prev.map((c) => c.$id === id ? { ...c, pinned } : c));
+    // Also update actionMenuConv so the button label reflects new state
+    if (actionMenuConv?.$id === id) setActionMenuConv(p => p ? { ...p, pinned } : p);
+    toast(pinned ? '📌 Pinned to top' : 'Unpinned');
   };
 
-  const handleRename = async (id: string, title: string) => {
-    await renameConversation(id, title).catch(() => { });
-    setConversations((prev) => prev.map((c) => c.$id === id ? { ...c, title } : c));
-    if (activeConv?.$id === id) setActiveConv((p) => p ? { ...p, title } : p);
+  const handleRenameSubmit = async () => {
+    if (!actionMenuConv || !renameText.trim()) {
+      setIsRenaming(false);
+      return;
+    }
+    const id = actionMenuConv.$id;
+    const newTitle = renameText.trim();
+    await renameConversation(id, newTitle).catch(() => { });
+    setConversations((prev) => prev.map((c) => c.$id === id ? { ...c, title: newTitle } : c));
+    if (activeConv?.$id === id) setActiveConv((p) => p ? { ...p, title: newTitle } : p);
+    setIsRenaming(false);
+    setActionMenuVisible(false);
+    toast('✏️ Renamed');
   };
 
   const handleDeleteMsg = async (msgId: string) => {
@@ -357,17 +461,19 @@ export default function AIScreen() {
     Clipboard.setString(text);
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  const bg = colors.bg0;
-  const borderColor = colors.border;
+  const toast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 2200);
+  };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   const isEmptyChat = messages.length === 0 && !isTyping;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: bg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
       {/* ── Header ── */}
-      <View style={[styles.header, { borderBottomColor: borderColor, backgroundColor: bg }]}>
-        <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.headerBtn}>
+      <View style={[styles.header, { borderBottomColor: colors.glassBorder, backgroundColor: 'transparent' }]}>
+        <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.headerBtn} activeOpacity={0.7}>
           <Ionicons name="menu" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
 
@@ -381,10 +487,16 @@ export default function AIScreen() {
         </View>
 
         <TouchableOpacity
-          onPress={() => { setActiveConv(null); setMessages([]); historyRef.current = []; startNewConversation(); }}
+          onPress={() => {
+            setActiveConv(null);
+            setMessages([]);
+            historyRef.current = [];
+            startNewConversation();
+          }}
           style={styles.headerBtn}
+          activeOpacity={0.7}
         >
-          <Ionicons name="create-outline" size={22} color="#7C3AED" />
+          <Ionicons name="create-outline" size={22} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -396,7 +508,7 @@ export default function AIScreen() {
         {/* ── Messages ── */}
         {isLoadingConvs ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#7C3AED" size="large" />
+            <ActivityIndicator color={colors.accent} size="large" />
           </View>
         ) : (
           <FlatList
@@ -406,30 +518,35 @@ export default function AIScreen() {
             contentContainerStyle={[styles.messageList, isEmptyChat && { flex: 1 }]}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                {/* Hero */}
-                <View style={styles.heroIcon}>
-                  <Ionicons name="sparkles" size={36} color="#7C3AED" />
+                {/* Hero Icon */}
+                <View style={[styles.heroIconWrap, { backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.accentMid }]}>
+                  <Ionicons name="sparkles" size={30} color={colors.accent} />
                 </View>
+
                 <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-                  AI Productivity Hub
+                  How can I help you?
                 </Text>
-                <Text style={[styles.heroSub, { color: colors.textMuted }]}>
-                  Manage tasks &amp; notes through natural language.{'\n'}Try a suggestion below or type your own.
+                <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
+                  I can manage your tasks and notes effortlessly.{'\n'}Try a suggestion or ask me anything.
                 </Text>
 
-                {/* Suggestions */}
-                <View style={styles.suggestions}>
+                {/* Suggestion Grid */}
+                <View style={styles.suggestionsGrid}>
                   {SUGGESTIONS.map((s, i) => (
                     <TouchableOpacity
                       key={i}
-                      style={[styles.suggCard, { backgroundColor: colors.bg1, borderColor: s.color + '40' }]}
+                      style={styles.suggCard}
                       onPress={() => handleSuggestion(s.text)}
-                      activeOpacity={0.75}
+                      activeOpacity={0.65}
                     >
-                      <View style={[styles.suggIcon, { backgroundColor: s.color + '20' }]}>
-                        <Ionicons name={s.icon as any} size={16} color={s.color} />
-                      </View>
-                      <Text style={[styles.suggText, { color: colors.textSecondary }]}>{s.text}</Text>
+                      <GlassCard intensity={30} style={{ padding: 13, borderColor: colors.glassBorder }}>
+                        <View style={[styles.suggIconWrap, { backgroundColor: s.color + '22' }]}>
+                          <Ionicons name={s.icon as any} size={18} color={s.color} />
+                        </View>
+                        <Text style={[styles.suggText, { color: colors.textSecondary }]} numberOfLines={3}>
+                          {s.text}
+                        </Text>
+                      </GlassCard>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -457,7 +574,7 @@ export default function AIScreen() {
         />
       </KeyboardAvoidingView>
 
-      {/* ── Sidebar ── */}
+      {/* ── Sidebar Drawer ── */}
       <ConversationSidebar
         visible={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -465,10 +582,171 @@ export default function AIScreen() {
         activeId={activeConv?.$id ?? null}
         onSelect={loadConversation}
         onNew={() => { setActiveConv(null); setMessages([]); historyRef.current = []; }}
-        onDelete={handleDeleteConv}
-        onPin={handlePin}
-        onRename={handleRename}
+        onActionMenu={(conv) => {
+          setActionMenuConv(conv);
+          setRenameText(conv.title);
+          setIsRenaming(false);
+          setActionMenuVisible(true);
+        }}
       />
+
+      {/* ── Action Menu Bottom Sheet ── */}
+      <Modal
+        visible={actionMenuVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => { setActionMenuVisible(false); setIsRenaming(false); }}
+      >
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity
+            style={styles.bsOverlay}
+            activeOpacity={1}
+            onPress={() => { setActionMenuVisible(false); setIsRenaming(false); }}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[styles.bsSheet, { backgroundColor: colors.bg1, paddingBottom: insets.bottom + spacing.lg }]}
+            >
+              <View style={[styles.bsHandle, { backgroundColor: colors.bg3 }]} />
+
+              {actionMenuConv && !isRenaming && (
+                <>
+                  <Text style={[styles.bsTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {actionMenuConv.title}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.bsItem}
+                    onPress={() => { handlePin(actionMenuConv.$id, !actionMenuConv.pinned); setActionMenuVisible(false); }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.bsItemIcon, { backgroundColor: colors.warningSoft }]}>
+                      <Ionicons name={actionMenuConv.pinned ? 'pin-outline' : 'pin'} size={20} color={colors.warning} />
+                    </View>
+                    <Text style={[styles.bsItemText, { color: colors.textPrimary }]}>
+                      {actionMenuConv.pinned ? 'Unpin conversation' : 'Pin to top'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.bsItem}
+                    onPress={() => setIsRenaming(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.bsItemIcon, { backgroundColor: colors.accentSoft }]}>
+                      <Ionicons name="pencil" size={20} color={colors.accent} />
+                    </View>
+                    <Text style={[styles.bsItemText, { color: colors.textPrimary }]}>Rename</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.bsItem, { borderBottomWidth: 0 }]}
+                    onPress={() => { setActionMenuVisible(false); handleDeleteConvRequest(actionMenuConv.$id); }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.bsItemIcon, { backgroundColor: colors.errorSoft }]}>
+                      <Ionicons name="trash-outline" size={20} color={colors.error} />
+                    </View>
+                    <Text style={[styles.bsItemText, { color: colors.error }]}>Delete conversation</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {actionMenuConv && isRenaming && (
+                <>
+                  <Text style={[styles.bsTitle, { color: colors.textPrimary }]}>Rename</Text>
+                  <TextInput
+                    style={[styles.renameInput, {
+                      backgroundColor: colors.bg2,
+                      color: colors.textPrimary,
+                      borderColor: colors.borderLight,
+                    }]}
+                    value={renameText}
+                    onChangeText={setRenameText}
+                    autoFocus
+                    placeholder="Conversation name…"
+                    placeholderTextColor={colors.textMuted}
+                    onSubmitEditing={handleRenameSubmit}
+                    returnKeyType="done"
+                  />
+                  <View style={styles.renameActions}>
+                    <TouchableOpacity
+                      style={[styles.renameBtn, { backgroundColor: colors.bg3 }]}
+                      onPress={() => setIsRenaming(false)}
+                    >
+                      <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.renameBtn, { backgroundColor: colors.accent }]}
+                      onPress={handleRenameSubmit}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Delete Confirm Bottom Sheet ── */}
+      <Modal
+        visible={deleteConfirmVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.bsOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteConfirmVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[styles.bsSheet, { backgroundColor: colors.bg1, paddingBottom: insets.bottom + spacing.lg }]}
+          >
+            <View style={[styles.bsHandle, { backgroundColor: colors.bg3 }]} />
+
+            <View style={[styles.deleteIconCircle, { backgroundColor: colors.errorSoft }]}>
+              <Ionicons name="trash" size={28} color={colors.error} />
+            </View>
+
+            <Text style={[styles.bsTitle, { color: colors.textPrimary, textAlign: 'center' }]}>
+              Delete Conversation?
+            </Text>
+            <Text style={[styles.bsSubtitle, { color: colors.textSecondary, textAlign: 'center' }]}>
+              This will permanently delete all messages in this conversation. This action cannot be undone.
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.deleteConfirmBtn, { backgroundColor: colors.error }]}
+              onPress={handleDeleteConvConfirm}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash-outline" size={18} color="#fff" />
+              <Text style={styles.deleteConfirmBtnText}>Delete Conversation</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.deleteCancelBtn, { backgroundColor: colors.bg2 }]}
+              onPress={() => setDeleteConfirmVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.deleteCancelBtnText, { color: colors.textPrimary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Toast ── */}
+      {showToast && (
+        <View style={styles.toastContainer} pointerEvents="none">
+          <View style={[styles.toast, { backgroundColor: colors.bg3 }]}>
+            <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600' }}>{showToast}</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -476,67 +754,244 @@ export default function AIScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    gap: spacing.sm,
   },
   headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   headerCenter: { flex: 1, alignItems: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  aiDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22C55E' },
+  aiDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
   headerTitle: { fontSize: 15, fontWeight: '700' },
-  headerSub: { fontSize: 10, marginTop: 1 },
+
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   messageList: { paddingVertical: spacing.md },
+
+  // Empty state
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 12,
   },
-  heroIcon: {
-    width: 72, height: 72, borderRadius: 22,
-    backgroundColor: '#7C3AED20',
+  heroIconWrap: {
+    width: 76, height: 76, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  heroTitle: { fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
-  heroSub: { fontSize: 13.5, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-  suggestions: { width: '100%', gap: 10 },
+  heroTitle: { fontSize: 24, fontWeight: '800', marginBottom: 8, textAlign: 'center', letterSpacing: -0.3 },
+  heroSub: { fontSize: 13.5, textAlign: 'center', lineHeight: 21, marginBottom: 28 },
+
+  // Suggestion grid
+  suggestionsGrid: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
   suggCard: {
+    width: '47.5%',
+    padding: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 0,
+  },
+  suggIconWrap: {
+    width: 34, height: 34, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 8,
+  },
+  suggText: { fontSize: 12.5, lineHeight: 18, fontWeight: '500' },
+
+  // ── Drawer ──────────────────────────────────────────────────────────────────
+  drawer: {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    width: SIDEBAR_WIDTH,
+    borderRightWidth: 1,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 6, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+  },
+  drawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  drawerHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  drawerLogo: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  drawerTitle: { fontSize: 17, fontWeight: '700' },
+  newChatFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  newChatFabText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  drawerSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 6,
+  },
+
+  convRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    padding: 14,
-    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 2,
+  },
+  convRowIcon: {
+    width: 30, height: 30, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  convRowTitle: { fontSize: 14, fontWeight: '500' },
+
+  emptyDrawer: {
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 8,
+  },
+  emptyDrawerText: { fontSize: 15, fontWeight: '600', marginTop: 8 },
+  emptyDrawerSub: { fontSize: 13 },
+
+  // ── Bottom Sheet common ────────────────────────────────────────────────────
+  bsOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bsSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: spacing.xl,
+    paddingTop: 14,
+    elevation: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+  },
+  bsHandle: {
+    width: 44, height: 4, borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  bsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  bsSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+
+  // Action menu items
+  bsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150,150,150,0.1)',
+  },
+  bsItemIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bsItemText: { fontSize: 16, fontWeight: '500' },
+
+  // Rename
+  renameInput: {
     borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 15,
+    marginBottom: 16,
+    marginTop: 8,
   },
-  suggIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  suggText: { flex: 1, fontSize: 13.5, lineHeight: 19 },
-  empty: { textAlign: 'center', marginTop: 24 },
-  // Sidebar
-  sidebarOverlay: { flex: 1, flexDirection: 'row' },
-  sidebarDismiss: { flex: 1 },
-  sidebar: { width: 280, height: '100%', elevation: 20, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20 },
-  sidebarHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.md, paddingVertical: 14, borderBottomWidth: 1,
+  renameActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
   },
-  newChatBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+  renameBtn: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
-  newChatText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  convItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: spacing.md, paddingVertical: 13,
+
+  // Delete confirm
+  deleteIconCircle: {
+    width: 64, height: 64, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
-  convIcon: { width: 22, alignItems: 'center' },
-  convTitle: { flex: 1, fontSize: 14 },
+  deleteConfirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 14,
+    marginTop: spacing.sm,
+  },
+  deleteConfirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  deleteCancelBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 10,
+  },
+  deleteCancelBtnText: { fontSize: 15, fontWeight: '600' },
+
+  // Toast
+  toastContainer: {
+    position: 'absolute',
+    bottom: 110,
+    left: 0, right: 0,
+    alignItems: 'center',
+  },
+  toast: {
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
 });

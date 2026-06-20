@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { spacing, radii } from '@/src/theme/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AIPanelProps {
   content: string;
@@ -72,11 +75,11 @@ ${noteContent || '(The note is currently empty — create fresh content)'}`;
       if (res.ok) {
         return data.choices?.[0]?.message?.content ?? null;
       } else {
-        console.warn(`Groq API Error (${res.status}) on key ${key?.slice(0,8)}:`, data?.error?.message);
+        console.warn(`Groq API Error (${res.status}) on key ${key?.slice(0, 8)}:`, data?.error?.message);
         // Continue to the next key
       }
     } catch (err) {
-      console.warn(`Groq Fetch Error on key ${key?.slice(0,8)}:`, err);
+      console.warn(`Groq Fetch Error on key ${key?.slice(0, 8)}:`, err);
       // Continue to the next key
     }
   }
@@ -87,6 +90,7 @@ ${noteContent || '(The note is currently empty — create fresh content)'}`;
 // ─── Component ─────────────────────────────────────────────────────────────────
 export function AIPanel({ content, onApplyAI, onClose }: AIPanelProps) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeChip, setActiveChip] = useState<number | null>(null);
@@ -130,223 +134,246 @@ export function AIPanel({ content, onApplyAI, onClose }: AIPanelProps) {
     }
   };
 
-  const panelBg = isDark ? '#1A1625' : '#F5F3FF';
-  const inputBg = isDark ? '#251E3A' : '#FFFFFF';
-  const borderColor = isDark ? '#3D2F6A' : '#DDD6FE';
-
   return (
-    <View style={[styles.container, { backgroundColor: panelBg, borderBottomColor: borderColor }]}>
-      {/* ── Gradient-style header bar ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.iconRing}>
-            <View style={styles.iconBadge}>
-              <Ionicons name="sparkles" size={14} color="#fff" />
-            </View>
-          </View>
-          <View style={{ marginLeft: 10 }}>
-            <Text style={styles.headerTitle}>AI Writing Assistant</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          onPress={onClose}
-          disabled={isLoading}
-          style={[styles.closeBtn, { backgroundColor: isDark ? '#2D2444' : '#EDE9FE' }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="close" size={16} color="#8B5CF6" />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Divider ── */}
-      <View style={[styles.divider, { backgroundColor: borderColor }]} />
-
-      {/* ── Quick action chips ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="always"
-        style={styles.chipsScrollView}
-        contentContainerStyle={styles.chipsContent}
+    <Modal visible={true} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {QUICK_ACTIONS.map((item, idx) => {
-          const isActive = activeChip === idx;
-          return (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: isActive ? item.color + '30' : isDark ? '#251E3A' : '#EDE9FE',
-                  borderColor: isActive ? item.color : borderColor,
-                },
-                isLoading && !isActive && { opacity: 0.45 },
-              ]}
-              onPress={() => handleGenerate(item.cmd, idx)}
-              disabled={isLoading}
-              activeOpacity={0.75}
-            >
-              {isActive && isLoading ? (
-                <ActivityIndicator size={12} color={item.color} style={{ marginRight: 5 }} />
-              ) : (
-                <Ionicons
-                  name={item.icon as any}
-                  size={13}
-                  color={isActive ? item.color : '#8B5CF6'}
-                  style={{ marginRight: 4 }}
-                />
-              )}
-              <Text style={[styles.chipText, { color: isActive ? item.color : isDark ? '#C4B5FD' : '#6D28D9' }]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.container,
+              { 
+                backgroundColor: colors.bg1, 
+                borderTopColor: colors.border,
+                paddingBottom: Platform.OS === 'ios' ? 40 : insets.bottom > 35 ? insets.bottom + 12 : 24
+              }
+            ]}
+          >
+            {/* ── Drag Handle ── */}
+            <View style={styles.dragHandleContainer}>
+              <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+            </View>
 
-      {/* ── Custom prompt input ── */}
-      <View style={[styles.inputWrapper, { backgroundColor: inputBg, borderColor: isLoading ? '#8B5CF6' : borderColor }]}>
-        <TextInput
-          ref={inputRef}
-          style={[styles.input, { color: colors.textPrimary }]}
-          placeholder="Ask AI anything… e.g. 'Create a study plan for JavaScript'"
-          placeholderTextColor={isDark ? '#6B5FA0' : '#9CA3AF'}
-          value={prompt}
-          onChangeText={setPrompt}
-          multiline
-          maxLength={600}
-          editable={!isLoading}
-          returnKeyType="default"
-        />
-        <TouchableOpacity
-          style={[
-            styles.sendBtn,
-            { backgroundColor: isLoading || !prompt.trim() ? (isDark ? '#3D2F6A' : '#DDD6FE') : '#7C3AED' },
-          ]}
-          onPress={() => handleGenerate()}
-          disabled={isLoading || !prompt.trim()}
-          activeOpacity={0.8}
-        >
-          {isLoading && activeChip === null ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="arrow-up" size={18} color={!prompt.trim() ? '#8B5CF6' : '#fff'} />
-          )}
+            {/* ── Header ── */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <View style={[styles.iconRing, { backgroundColor: colors.accent + '20' }]}>
+                  <View style={[styles.iconBadge, { backgroundColor: colors.accent }]}>
+                    <Ionicons name="sparkles" size={14} color="#fff" />
+                  </View>
+                </View>
+                <View style={{ marginLeft: 12 }}>
+                  <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>AI Writing Assistant</Text>
+                  {/* <Text style={[styles.headerSub, { color: colors.textMuted }]}>Powered by Groq</Text> */}
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={onClose}
+                disabled={isLoading}
+                style={[styles.closeBtn, { backgroundColor: colors.bg2 }]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ── Quick action chips ── */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              style={styles.chipsScrollView}
+              contentContainerStyle={styles.chipsContent}
+            >
+              {QUICK_ACTIONS.map((item, idx) => {
+                const isActive = activeChip === idx;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isActive ? item.color + '20' : colors.bg2,
+                        borderColor: isActive ? item.color : colors.border,
+                      },
+                      isLoading && !isActive && { opacity: 0.45 },
+                    ]}
+                    onPress={() => handleGenerate(item.cmd, idx)}
+                    disabled={isLoading}
+                    activeOpacity={0.75}
+                  >
+                    {isActive && isLoading ? (
+                      <ActivityIndicator size={12} color={item.color} style={{ marginRight: 6 }} />
+                    ) : (
+                      <Ionicons
+                        name={item.icon as any}
+                        size={14}
+                        color={isActive ? item.color : colors.textSecondary}
+                        style={{ marginRight: 6 }}
+                      />
+                    )}
+                    <Text style={[styles.chipText, { color: isActive ? item.color : colors.textPrimary }]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* ── Custom prompt input ── */}
+            <View style={[styles.inputWrapper, { backgroundColor: colors.bg2, borderColor: isLoading ? colors.accent : colors.border }]}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.input, { color: colors.textPrimary }]}
+                placeholder="Ask AI to write, rewrite, or summarize..."
+                placeholderTextColor={colors.textMuted}
+                value={prompt}
+                onChangeText={setPrompt}
+                multiline
+                maxLength={600}
+                editable={!isLoading}
+                returnKeyType="default"
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn,
+                  { backgroundColor: isLoading || !prompt.trim() ? colors.bg3 : colors.accent },
+                ]}
+                onPress={() => handleGenerate()}
+                disabled={isLoading || !prompt.trim()}
+                activeOpacity={0.8}
+              >
+                {isLoading && activeChip === null ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="arrow-up" size={18} color={!prompt.trim() ? colors.textMuted : '#fff'} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </TouchableOpacity>
-      </View>
-    </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
   container: {
-    paddingTop: 14,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    elevation: 8,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    elevation: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
     shadowRadius: 12,
+  },
+  dragHandleContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 10,
+    paddingHorizontal: 24,
+    marginBottom: 20,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconRing: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#7C3AED20',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: '#7C3AED',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#8B5CF6',
     letterSpacing: 0.2,
   },
   headerSub: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: 1,
-    letterSpacing: 0.1,
+    fontSize: 11,
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
   closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  divider: {
-    height: 1,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    opacity: 0.6,
-  },
   chipsScrollView: {
-    marginBottom: 10,
+    marginBottom: 20,
   },
   chipsContent: {
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: 24,
+    gap: 10,
     flexDirection: 'row',
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
     borderWidth: 1,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginHorizontal: 16,
+    marginHorizontal: 24,
     borderWidth: 1.5,
-    borderRadius: 16,
-    paddingLeft: 14,
-    paddingRight: 6,
-    paddingVertical: 6,
-    gap: 6,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 8,
+    gap: 10,
   },
   input: {
     flex: 1,
-    minHeight: 36,
-    maxHeight: 100,
-    fontSize: 13.5,
-    lineHeight: 20,
-    paddingTop: Platform.OS === 'ios' ? 4 : 0,
+    minHeight: 40,
+    maxHeight: 120,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingTop: Platform.OS === 'ios' ? 8 : 4,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 4,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
   },
 });

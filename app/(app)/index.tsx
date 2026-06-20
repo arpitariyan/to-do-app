@@ -17,9 +17,11 @@ import { Screen } from '@/src/components/layout/Screen';
 import { Card } from '@/src/components/ui/Card';
 import { textStyles } from '@/src/theme/typography';
 import { spacing, radii, shadows } from '@/src/theme/tokens';
+import { GlassCard } from '@/src/components/ui/GlassCard';
 import { useTasks, useUpdateTask } from '@/src/hooks/useTasks';
 import { useNotes } from '@/src/hooks/useNotes';
 import { TaskItem } from '@/src/components/tasks/TaskItem';
+import { AvatarStack } from '@/src/components/ui/AvatarStack';
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -83,6 +85,28 @@ export default function DashboardScreen() {
     ? 0 
     : Math.round((completedToday.length / (todayTasks.length + completedToday.length)) * 100);
 
+  const aiInsight = useMemo(() => {
+    const total = todayTasks.length + completedToday.length;
+    if (total === 0) {
+      return { title: 'Take a Break', message: "Your schedule is completely clear today. Great time to review your notes or just relax!" };
+    }
+    const completion = completedToday.length / total;
+    if (completion === 1) {
+      return { title: 'All Done!', message: "You've crushed all your tasks for today. Outstanding work! 🌟" };
+    }
+    if (completion >= 0.5) {
+      return { title: 'Halfway There!', message: `You've completed ${completedToday.length} out of ${total} tasks. Keep up the momentum, you're doing great!` };
+    }
+    if (todayTasks.length > 0) {
+      const urgent = todayTasks.find(t => t.priority === 'urgent' || t.priority === 'high');
+      if (urgent) {
+        return { title: 'Focus Required', message: `You have ${todayTasks.length} pending tasks. I suggest starting with "${urgent.title}" due to its high priority.` };
+      }
+      return { title: 'Time to Focus', message: `You have ${todayTasks.length} pending task(s). Consider starting with "${todayTasks[0].title}" to get the ball rolling.` };
+    }
+    return { title: 'Hello', message: 'Let us make today a productive day!' };
+  }, [todayTasks, completedToday]);
+
   return (
     <Screen withBottomPad noPadding>
       <ScrollView
@@ -92,25 +116,27 @@ export default function DashboardScreen() {
         {/* 1. Greeting Header */}
         <Animated.View entering={FadeInDown.delay(0).duration(500)} style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={[textStyles.body, { color: colors.textSecondary }]}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </Text>
             <Text 
-              style={[textStyles.screenTitle, { color: colors.textPrimary, fontSize: 26, lineHeight: 32 }]}
-              numberOfLines={2}
+              style={[textStyles.screenTitle, { color: colors.textPrimary, fontSize: 36, lineHeight: 44, fontWeight: '800' }]}
+              numberOfLines={3}
             >
-              {getGreeting()}, {firstName}
+              Start Your Day{'\n'}& Be Productive ✌️
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.avatar, { backgroundColor: colors.accent, shadowColor: colors.accent, elevation: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }]}
-            onPress={() => router.push('/(app)/settings')}
-            activeOpacity={0.8}
-          >
-            <Text style={[textStyles.sectionTitle, { color: '#FFFFFF' }]}>
-              {firstName.charAt(0).toUpperCase()}
+        </Animated.View>
+
+        {/* User / Team Stats */}
+        <Animated.View entering={FadeInDown.delay(50).duration(500)} style={styles.statsRow}>
+          <View style={styles.avatarStackWrapper}>
+            <AvatarStack size={48} max={4} />
+          </View>
+          
+          <GlassCard style={styles.statsBadge} intensity={40}>
+            <View style={[styles.statsDot, { backgroundColor: colors.success }]} />
+            <Text style={[textStyles.bodySm, { color: colors.textPrimary, fontWeight: '600' }]}>
+              You have {todayTasks.length} tasks today.
             </Text>
-          </TouchableOpacity>
+          </GlassCard>
         </Animated.View>
 
         {isLoading ? (
@@ -192,40 +218,64 @@ export default function DashboardScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.notesScroll}>
                   {recentNotes.map((note, index) => {
-                    const pastelColors = ['#F3E8FF', '#D1FAE5', '#E0F2FE', '#FFEDD5']; // Lavender, Mint, Sky, Peach
-                    const darkColors = ['#4C1D95', '#064E3B', '#0C4A6E', '#7C2D12'];
+                    const pastelColors = ['rgba(243,232,255,0.4)', 'rgba(209,250,229,0.4)', 'rgba(224,242,254,0.4)', 'rgba(255,237,213,0.4)'];
+                    const darkColors = ['rgba(76,29,149,0.4)', 'rgba(6,78,59,0.4)', 'rgba(12,74,110,0.4)', 'rgba(124,45,18,0.4)'];
                     const bg = colors.bg1 === '#FFFFFF' ? pastelColors[index % 4] : darkColors[index % 4];
-                    const textColor = colors.bg1 === '#FFFFFF' ? '#18181B' : '#F8FAFC';
+                    const textColor = colors.textPrimary;
                     
                     return (
                       <TouchableOpacity
-                        key={note.$id}
-                        style={[styles.noteCard, { backgroundColor: bg }]}
-                        activeOpacity={0.8}
-                        onPress={() => handlePressNote(note.$id)}
-                      >
-                        <Text style={[textStyles.cardTitle, { color: textColor }]} numberOfLines={2}>
-                          {note.title || 'Untitled'}
-                        </Text>
-                        <Text style={[textStyles.caption, { color: textColor, opacity: 0.7, marginTop: spacing.sm }]} numberOfLines={3}>
-                          {note.content ? note.content.replace(/<[^>]*>?/gm, '').trim() : 'Empty note...'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </Animated.View>
-            )}
+                         key={note.$id}
+                         activeOpacity={0.8}
+                         onPress={() => handlePressNote(note.$id)}
+                       >
+                         <GlassCard style={[styles.noteCard, { backgroundColor: bg }]} intensity={30}>
+                           <Text style={[textStyles.cardTitle, { color: textColor }]} numberOfLines={2}>
+                             {note.title || 'Untitled'}
+                           </Text>
+                           <Text style={[textStyles.caption, { color: textColor, opacity: 0.7, marginTop: spacing.sm }]} numberOfLines={3}>
+                             {note.content ? note.content.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : 'Empty note...'}
+                           </Text>
+                         </GlassCard>
+                       </TouchableOpacity>
+                     );
+                   })}
+                 </ScrollView>
+               </Animated.View>
+             )}
 
-            {/* 6. AI Suggestions */}
+            {/* 6. Smart Assistant Insight */}
             <Animated.View entering={FadeInDown.delay(500).duration(500)} style={[styles.section, { marginBottom: spacing['3xl'] }]}>
-              <Text style={[textStyles.sectionTitle, { color: colors.textPrimary, marginBottom: spacing.md }]}>
-                AI Suggestions
-              </Text>
-              <View style={styles.aiGrid}>
-                <AISuggestionCard label="Plan My Day" icon="calendar-outline" colors={colors} />
-                <AISuggestionCard label="Summarize Notes" icon="documents-outline" colors={colors} />
+              <View style={styles.sectionHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="sparkles" size={20} color={colors.accent} style={{ marginRight: 8 }} />
+                  <Text style={[textStyles.sectionTitle, { color: colors.textPrimary }]}>AI Insight</Text>
+                </View>
               </View>
+              
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => router.push('/(app)/ai')}
+              >
+                <GlassCard
+                  style={[styles.aiInsightCard, { borderColor: colors.accent }]}
+                  intensity={40}
+                  tint={colors.bg1 === '#FFFFFF' ? 'light' : 'dark'}
+                >
+                  <View style={styles.aiInsightHeader}>
+                     <View style={[styles.aiIconWrapper, { backgroundColor: colors.accent }]}>
+                       <Ionicons name="planet" size={24} color="#FFF" />
+                     </View>
+                     <Text style={[textStyles.headingSm, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
+                       {aiInsight.title}
+                     </Text>
+                     <Ionicons name="arrow-forward" size={20} color={colors.accent} />
+                  </View>
+                  <Text style={[textStyles.bodyMd, { color: colors.textSecondary, marginTop: spacing.md, lineHeight: 22 }]}>
+                     {aiInsight.message}
+                  </Text>
+                </GlassCard>
+              </TouchableOpacity>
             </Animated.View>
           </>
         )}
@@ -253,13 +303,15 @@ function OverviewCard({ label, value, icon, color, colors }: {
   colors: ReturnType<typeof useTheme>['colors'];
 }) {
   return (
-    <View style={[styles.overviewCard, { backgroundColor: colors.bg1, borderColor: colors.border }]}>
-      <View style={[styles.overviewIcon, { backgroundColor: `${color}15` }]}>
+    <GlassCard style={styles.overviewCardWrapper} intensity={30}>
+      <View style={[styles.iconBox, { backgroundColor: `${color}30` }]}>
         <Ionicons name={icon} size={20} color={color} />
       </View>
-      <Text style={[textStyles.screenTitle, { fontSize: 24, color: colors.textPrimary, marginTop: spacing.sm }]}>{value}</Text>
-      <Text style={[textStyles.meta, { color: colors.textSecondary }]}>{label}</Text>
-    </View>
+      <View style={styles.overviewTextWrap}>
+        <Text style={[textStyles.caption, { color: colors.textSecondary, marginBottom: 2 }]} numberOfLines={1}>{label}</Text>
+        <Text style={[textStyles.headingMd, { color: colors.textPrimary }]} numberOfLines={1}>{value}</Text>
+      </View>
+    </GlassCard>
   );
 }
 
@@ -271,30 +323,11 @@ function QuickActionBtn({ label, icon, color, colors, onPress }: {
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.quickAction, { backgroundColor: colors.bg1, borderColor: colors.border }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.quickIcon, { backgroundColor: `${color}15` }]}>
+    <TouchableOpacity style={styles.quickActionBtn} onPress={onPress} activeOpacity={0.7}>
+      <GlassCard intensity={40} style={[styles.quickActionIcon, { borderColor: `${color}30` }]}>
         <Ionicons name={icon} size={24} color={color} />
-      </View>
-      <Text style={[textStyles.meta, { color: colors.textPrimary, fontFamily: 'Inter_600SemiBold', marginTop: spacing.sm }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-function AISuggestionCard({ label, icon, colors }: {
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  colors: ReturnType<typeof useTheme>['colors'];
-}) {
-  return (
-    <TouchableOpacity style={[styles.aiSuggestion, { backgroundColor: colors.bg2, borderColor: colors.border }]} activeOpacity={0.7}>
-      <Ionicons name={icon} size={20} color={colors.accent} />
-      <Text style={[textStyles.body, { color: colors.textPrimary, marginLeft: spacing.sm, fontFamily: 'Inter_500Medium' }]}>
+      </GlassCard>
+      <Text style={[textStyles.meta, { color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -311,19 +344,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing['2xl'],
+    marginBottom: spacing.md,
   },
   headerText: {
     flex: 1,
-    paddingRight: spacing.lg,
     gap: 4,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  statsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: spacing['2xl'],
+    gap: spacing.lg,
+  },
+  statsBadge: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    gap: spacing.sm,
+  },
+  statsDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  avatarStackWrapper: {
+    padding: 2,
+    backgroundColor: 'transparent',
+    borderRadius: radii.full,
   },
   section: {
     marginTop: spacing['2xl'],
@@ -341,18 +392,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  overviewCard: {
+  overviewCardWrapper: {
     flex: 1,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    borderWidth: 1,
+    padding: spacing.lg,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: 110,
   },
-  overviewIcon: {
-    width: 40,
-    height: 40,
+  iconBox: {
+    width: 36,
+    height: 36,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  overviewTextWrap: {
+    flexDirection: 'column',
   },
   focusHeader: {
     flexDirection: 'row',
@@ -386,17 +442,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  quickAction: {
+  quickActionBtn: {
     flex: 1,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    borderWidth: 1,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  quickIcon: {
-    width: 48,
-    height: 48,
+  quickActionIcon: {
+    width: 72,
+    height: 72,
     borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -408,18 +460,27 @@ const styles = StyleSheet.create({
   noteCard: {
     width: 160,
     height: 160,
-    padding: spacing.md,
-    borderRadius: radii.xl,
+    padding: spacing.lg,
+    borderRadius: radii['2xl'],
   },
   aiGrid: {
     gap: spacing.sm,
   },
-  aiSuggestion: {
+  aiInsightCard: {
+    padding: spacing.lg,
+    borderRadius: radii['2xl'],
+    marginTop: spacing.xs,
+  },
+  aiInsightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
+  },
+  aiIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fab: {
     position: 'absolute',

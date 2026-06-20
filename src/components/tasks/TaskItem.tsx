@@ -6,6 +6,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import { spacing, radii } from '../../theme/tokens';
 import { textStyles } from '../../theme/typography';
 import { Checkbox } from '../ui/Checkbox';
+import { AvatarStack } from '../ui/AvatarStack';
+import { GlassCard } from '../ui/GlassCard';
 import type { Task, TaskPriority } from '../../lib/api/tasks';
 
 interface TaskItemProps {
@@ -61,170 +63,142 @@ export function TaskItem({ task, onToggle, onPress }: TaskItemProps) {
     }).length;
   }
 
+  // Calculate progress percentage
+  const progressPercent = isDone 
+    ? 100 
+    : (totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0);
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => onPress(task.$id)}
-      style={[
-        styles.container,
-        { backgroundColor: colors.bg1, borderColor: colors.border }
-      ]}
+      style={{ marginBottom: spacing.md }}
     >
-      <View style={styles.left}>
+      <GlassCard intensity={40} disableAndroidBlur={true} style={styles.container}>
+        <View style={styles.headerRow}>
+        <View style={styles.tagList}>
+          <View style={[styles.tagBadge, { backgroundColor: priorityColor !== 'transparent' ? `${priorityColor}20` : colors.bg2 }]}>
+            <Text style={[textStyles.caption, { color: priorityColor !== 'transparent' ? priorityColor : colors.textPrimary, fontWeight: 'bold' }]}>
+              {task.priority !== 'none' ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Task'}
+            </Text>
+          </View>
+          {task.tags && task.tags.length > 0 && (
+            <View style={[styles.tagBadge, { backgroundColor: colors.bg2 }]}>
+              <Text style={[textStyles.caption, { color: colors.textPrimary }]}>
+                {task.tags[0]} {task.tags.length > 1 ? `+${task.tags.length - 1}` : ''}
+              </Text>
+            </View>
+          )}
+        </View>
         <Checkbox checked={isDone} onToggle={handleToggle} />
       </View>
       
-      <View style={styles.content}>
-        <Text
-          style={[
-            textStyles.bodyMd,
-            { color: isDone ? colors.textMuted : colors.textPrimary },
-            isDone && { textDecorationLine: 'line-through' }
-          ]}
-          numberOfLines={1}
-        >
-          {task.title}
+      <Text
+        style={[
+          textStyles.headingSm,
+          { color: isDone ? colors.textMuted : colors.textPrimary, marginTop: spacing.sm, marginBottom: spacing.xs },
+          isDone && { textDecorationLine: 'line-through' }
+        ]}
+        numberOfLines={2}
+      >
+        {task.title}
+      </Text>
+      
+      {task.description && (
+        <Text style={[textStyles.bodySm, { color: colors.textMuted, marginBottom: spacing.sm }]} numberOfLines={2}>
+          {task.description}
         </Text>
-        
-        {task.description && (
-          <Text style={[textStyles.bodySm, { color: colors.textMuted, marginTop: 4 }]} numberOfLines={1}>
-            {task.description}
-          </Text>
+      )}
+
+      {/* Metadata Row */}
+      <View style={styles.metaRow}>
+        {task.dueAt && (
+          <View style={styles.metaItem}>
+            <Ionicons name="calendar-outline" size={14} color={isOverdue ? colors.error : colors.textMuted} />
+            <Text style={[textStyles.caption, { color: isOverdue ? colors.error : colors.textMuted, fontWeight: '600' }]}>
+              {formatDueDate(task.dueAt)}
+            </Text>
+          </View>
         )}
-
-        {/* Metadata Row */}
-        {(task.description || task.dueAt || totalSubtasks > 0 || (task.tags && task.tags.length > 0) || task.repeatType || (task.attachments && task.attachments.length > 0)) && (
-          <View style={styles.metaRow}>
-            {task.dueAt && (
-              <View style={styles.metaItem}>
-                <Ionicons 
-                  name="calendar-outline" 
-                  size={12} 
-                  color={isOverdue ? colors.error : colors.textMuted} 
-                />
-                <Text style={[
-                  textStyles.caption, 
-                  { color: isOverdue ? colors.error : colors.textMuted }
-                ]}>
-                  {formatDueDate(task.dueAt)}
-                  {task.dueAt.includes('T') && new Date(task.dueAt).getHours() !== 23 ? ` at ${format(new Date(task.dueAt), 'h:mm a')}` : ''}
-                </Text>
-              </View>
-            )}
-
-            {task.repeatType && task.repeatType !== 'none' && (
-              <View style={styles.metaItem}>
-                <Ionicons name="repeat" size={12} color={colors.accent} />
-                <Text style={[textStyles.caption, { color: colors.accent, textTransform: 'capitalize' }]}>
-                  {task.repeatType}
-                </Text>
-              </View>
-            )}
-
-            {task.reminders && task.reminders.length > 0 && (
-              <View style={styles.metaItem}>
-                <Ionicons name="notifications" size={12} color={colors.warning} />
-              </View>
-            )}
-            
-            {totalSubtasks > 0 && (
-              <View style={styles.metaItem}>
-                <Ionicons name="git-merge-outline" size={12} color={completedSubtasks === totalSubtasks ? colors.success : colors.textMuted} />
-                <Text style={[textStyles.caption, { color: completedSubtasks === totalSubtasks ? colors.success : colors.textMuted }]}>
-                  {completedSubtasks}/{totalSubtasks}
-                </Text>
-              </View>
-            )}
-
-            {task.description && !task.notes && (
-              <View style={styles.metaItem}>
-                <Ionicons name="document-text-outline" size={12} color={colors.textMuted} />
-              </View>
-            )}
-
-            {task.notes && (
-              <View style={styles.metaItem}>
-                <Ionicons name="journal-outline" size={12} color={colors.accent} />
-              </View>
-            )}
-
-            {task.attachments && task.attachments.length > 0 && (
-              <View style={styles.metaItem}>
-                <Ionicons name="attach-outline" size={12} color={colors.textMuted} />
-                <Text style={[textStyles.caption, { color: colors.textMuted }]}>{task.attachments.length}</Text>
-              </View>
-            )}
-
-            {task.tags && task.tags.length > 0 && (
-              <View style={[styles.tagBadge, { backgroundColor: colors.bg2, flexShrink: 1, maxWidth: 120 }]}>
-                <Text 
-                  style={[textStyles.caption, { color: colors.textPrimary, fontSize: 10 }]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {task.tags[0]} {task.tags.length > 1 ? `+${task.tags.length - 1}` : ''}
-                </Text>
-              </View>
-            )}
+        {totalSubtasks > 0 && (
+          <View style={styles.metaItem}>
+            <Ionicons name="git-merge-outline" size={14} color={completedSubtasks === totalSubtasks ? colors.success : colors.textMuted} />
+            <Text style={[textStyles.caption, { color: completedSubtasks === totalSubtasks ? colors.success : colors.textMuted, fontWeight: '600' }]}>
+              {completedSubtasks}/{totalSubtasks}
+            </Text>
+          </View>
+        )}
+        {task.attachments && task.attachments.length > 0 && (
+          <View style={styles.metaItem}>
+            <Ionicons name="attach-outline" size={14} color={colors.textMuted} />
+            <Text style={[textStyles.caption, { color: colors.textMuted }]}>{task.attachments.length}</Text>
           </View>
         )}
       </View>
 
-      <View style={styles.right}>
-        {task.priority !== 'none' && (
-          <View 
-            style={[styles.priorityIndicator, { backgroundColor: priorityColor }]} 
-            accessibilityLabel={`Priority: ${task.priority}`}
-          />
-        )}
-      </View>
+      <View style={styles.footerRow}>
+        <AvatarStack size={28} max={3} />
+        
+        <View style={styles.progressContainer}>
+          <Text style={[textStyles.caption, { color: colors.textSecondary, marginBottom: 4, textAlign: 'right' }]}>
+            {progressPercent}%
+          </Text>
+          <View style={[styles.progressTrack, { backgroundColor: colors.bg2 }]}>
+            <View style={[styles.progressBar, { width: `${progressPercent}%`, backgroundColor: colors.success }]} />
+          </View>
+        </View>
+        </View>
+      </GlassCard>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    padding: spacing.lg,
+  },
+  headerRow: {
     flexDirection: 'row',
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  left: {
-    marginRight: spacing.md,
+  tagList: {
+    flexDirection: 'row',
+    gap: spacing.xs,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  tagBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.full,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
-    gap: spacing.sm,
+    marginTop: spacing.xs,
+    gap: spacing.md,
     flexWrap: 'wrap',
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  right: {
-    marginLeft: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: spacing.lg,
   },
-  priorityIndicator: {
-    width: 8,
+  progressContainer: {
+    width: 120,
+  },
+  progressTrack: {
     height: 8,
     borderRadius: 4,
+    overflow: 'hidden',
   },
-  tagBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radii.md,
-    flexShrink: 1,
-    maxWidth: '50%',
+  progressBar: {
+    height: '100%',
+    borderRadius: 4,
   },
 });

@@ -16,6 +16,7 @@ type FilterType = 'today' | 'upcoming' | 'completed';
 export default function TasksScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const isDark = colors.bg1 !== '#FFFFFF';
   
   const [filter, setFilter] = useState<FilterType>('today');
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,7 +71,7 @@ export default function TasksScreen() {
       </View>
 
       {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.bg2, borderColor: colors.border }]}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.glassSoft, borderColor: colors.glassBorder }]}>
         <Ionicons name="search" size={20} color={colors.textMuted} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.textPrimary, fontFamily: 'Inter_400Regular' }]}
@@ -87,7 +88,10 @@ export default function TasksScreen() {
       </View>
 
       {/* Segmented Control */}
-      <View style={[styles.tabsContainer, { backgroundColor: colors.bg2 }]}>
+      <View style={[
+        styles.tabsWrapper,
+        { backgroundColor: colors.glassSoft, borderColor: colors.glassBorder }
+      ]}>
         {(['today', 'upcoming', 'completed'] as FilterType[]).map((tab) => {
           const isActive = filter === tab;
           return (
@@ -95,12 +99,26 @@ export default function TasksScreen() {
               key={tab}
               style={[
                 styles.tab, 
-                isActive && { backgroundColor: colors.bg1, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 }
+                isActive ? [
+                  styles.tabActive,
+                  { 
+                    backgroundColor: colors.textPrimary,
+                  }
+                ] : { backgroundColor: 'transparent' }
               ]} 
               onPress={() => setFilter(tab)}
               activeOpacity={0.8}
             >
-              <Text style={[textStyles.body, { color: isActive ? colors.textPrimary : colors.textMuted, fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
+              <Text style={[
+                textStyles.body, 
+                { 
+                  color: isActive 
+                    ? colors.bg0 
+                    : colors.textSecondary, 
+                  fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                  fontSize: 13,
+                }
+              ]}>
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -119,7 +137,7 @@ export default function TasksScreen() {
         </View>
       ) : filteredTasks.length === 0 ? (
         <Animated.View entering={FadeInDown} style={styles.center}>
-          <View style={[styles.emptyIconBg, { backgroundColor: colors.bg2 }]}>
+          <View style={[styles.emptyIconBg, { backgroundColor: colors.glassSoft }]}>
             <Ionicons 
               name={filter === 'completed' ? "checkmark-done-circle-outline" : "calendar-clear-outline"} 
               size={48} 
@@ -139,8 +157,13 @@ export default function TasksScreen() {
           keyExtractor={(item) => item.$id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          windowSize={5}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
           renderItem={({ item, index }) => (
-            <Animated.View entering={FadeInDown.delay(index * 50).duration(400)}>
+            <Animated.View entering={FadeInDown.delay(Math.min(index, 10) * 50).duration(400)}>
               <TaskItem 
                 task={item} 
                 onToggle={handleToggleTask} 
@@ -173,8 +196,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: spacing.lg,
     paddingHorizontal: spacing.md,
-    height: 48,
-    borderRadius: radii.xl,
+    height: 52,
+    borderRadius: radii.full,
     borderWidth: 1,
     marginBottom: spacing.md,
   },
@@ -186,18 +209,26 @@ const styles = StyleSheet.create({
     height: '100%',
     fontSize: 15,
   },
-  tabsContainer: {
+  tabsWrapper: {
     flexDirection: 'row',
     marginHorizontal: spacing.lg,
-    padding: 4,
-    borderRadius: radii.lg,
     marginBottom: spacing.lg,
+    padding: 4,
+    borderRadius: radii.full,
+    borderWidth: 1,
   },
   tab: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: radii.md,
+    borderRadius: radii.full,
+  },
+  tabActive: {
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
   },
   listContent: {
     paddingHorizontal: spacing.lg,

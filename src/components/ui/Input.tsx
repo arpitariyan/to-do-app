@@ -4,9 +4,11 @@ import {
   Text,
   View,
   StyleSheet,
+  TouchableOpacity,
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../theme/ThemeContext';
 import { textStyles } from '../../theme/typography';
 import { radii, spacing } from '../../theme/tokens';
@@ -18,12 +20,14 @@ export interface InputProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   containerStyle?: ViewStyle;
+  isPassword?: boolean;
 }
 
 export const Input = forwardRef<TextInput, InputProps>((props, ref) => {
-  const { label, error, hint, leftIcon, rightIcon, containerStyle, onFocus, onBlur, style, ...rest } = props;
+  const { label, error, hint, leftIcon, rightIcon, containerStyle, isPassword, onFocus, onBlur, style, secureTextEntry, ...rest } = props;
   const { colors } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleFocus = (e: any) => {
     setIsFocused(true);
@@ -35,7 +39,7 @@ export const Input = forwardRef<TextInput, InputProps>((props, ref) => {
     if (onBlur) onBlur(e);
   };
 
-  const borderColor = error ? colors.error : isFocused ? colors.accent : colors.border;
+  const borderColor = error ? colors.error : isFocused ? colors.accent : colors.glassBorder;
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
@@ -48,7 +52,7 @@ export const Input = forwardRef<TextInput, InputProps>((props, ref) => {
       <View
         style={[
           styles.container,
-          { backgroundColor: colors.bg2, borderColor },
+          { backgroundColor: colors.glassSoft, borderColor },
         ]}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
@@ -65,9 +69,23 @@ export const Input = forwardRef<TextInput, InputProps>((props, ref) => {
           placeholderTextColor={colors.textMuted}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          secureTextEntry={isPassword ? !showPassword : secureTextEntry}
           {...rest}
         />
-        {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        {rightIcon && !isPassword && <View style={styles.iconRight}>{rightIcon}</View>}
+        {isPassword && (
+          <TouchableOpacity
+            style={styles.iconRight}
+            onPress={() => setShowPassword(!showPassword)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={showPassword ? 'eye-off' : 'eye'} 
+              size={20} 
+              color={colors.textMuted} 
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       {(error || hint) && (

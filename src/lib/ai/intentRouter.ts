@@ -41,6 +41,9 @@ interface HistoryMessage {
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
+// ─── Gemini Fallback Config ───────────────────────────────────────────────────
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+
 // ─── Helper: find task/note by partial title ─────────────────────────────────
 
 function findTaskByTitle(tasks: Task[], query: string): Task | undefined {
@@ -63,7 +66,7 @@ export async function processMessage(
     process.env.EXPO_PUBLIC_GROQ_API_KEY,
     process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
     process.env.EXPO_PUBLIC_GROQ_API_KEY_3,
-  ].filter(Boolean);
+  ].filter((key): key is string => Boolean(key));
 
   if (apiKeys.length === 0) {
     return { intent: 'NONE', reply: 'Groq API keys are not configured.', action: null };
@@ -159,7 +162,10 @@ IMPORTANT: Respond with ONLY the JSON object. No text before or after.`;
     try {
       const res = await fetch(GROQ_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${apiKey.trim()}` 
+        },
         body: JSON.stringify({
           model: GROQ_MODEL,
           messages,
@@ -175,20 +181,58 @@ IMPORTANT: Respond with ONLY the JSON object. No text before or after.`;
       } else {
         lastErrorMsg = data?.error?.message ?? `HTTP ${res.status}`;
         data = null; // Reset data so we know it failed
-        console.warn(`API Key ${apiKey?.slice(0, 8)}... failed. Trying next.`);
-        // Continue to the next key
+        console.warn(`[Groq] API Key ${apiKey?.slice(0, 8)}... failed. Error: ${lastErrorMsg}`);
       }
     } catch (e) {
       lastErrorMsg = String(e);
-      console.warn(`API Key ${apiKey?.slice(0, 8)}... threw an exception. Trying next.`);
-      // Continue to the next key
+      console.warn(`[Groq] API Key ${apiKey?.slice(0, 8)}... threw an exception. Error: ${lastErrorMsg}`);
+    }
+  }
+
+  // ─── AUTOMATIC FALLBACK TO GEMINI ──────────────────────────────────────────
+  if (!data) {
+    console.warn(`[Fallback] All Groq keys failed. Falling back to Gemini API...`);
+    const geminiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const geminiMessages = recentHistory.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        }));
+        geminiMessages.push({ role: 'user', parts: [{ text: userMessage }] });
+
+        const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: geminiMessages,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 4096,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+
+        const geminiData = await res.json();
+        if (res.ok) {
+          const geminiRawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+          data = { choices: [{ message: { content: geminiRawText } }] };
+          console.log(`[Fallback] Successfully got response from Gemini.`);
+        } else {
+          lastErrorMsg = `Gemini Fallback failed: ${geminiData?.error?.message ?? res.status}`;
+        }
+      } catch (e) {
+        lastErrorMsg = `Gemini Fallback exception: ${String(e)}`;
+      }
     }
   }
 
   if (!data) {
     return {
       intent: 'NONE',
-      reply: `AI Error: All keys failed. Last error: ${lastErrorMsg}`,
+      reply: `AI Error: All keys (including fallback) failed. Last error: ${lastErrorMsg}`,
       action: null,
       error: lastErrorMsg,
     };

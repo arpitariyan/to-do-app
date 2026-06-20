@@ -7,12 +7,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
+  Dimensions,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, SlideInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { useAuthStore } from '@/src/stores/authStore';
@@ -20,6 +22,9 @@ import { Button } from '@/src/components/ui/Button';
 import { Input } from '@/src/components/ui/Input';
 import { textStyles } from '@/src/theme/typography';
 import { spacing, radii } from '@/src/theme/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width, height } = Dimensions.get('window');
 
 const schema = z.object({
   email: z.string().email('Enter a valid email address'),
@@ -31,6 +36,7 @@ type FormData = z.infer<typeof schema>;
 export default function LoginScreen() {
   const { colors } = useTheme();
   const { signIn, isLoading, error, clearError } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const passwordRef = useRef<React.ComponentRef<typeof Input>>(null);
 
   const {
@@ -49,136 +55,190 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.bg0 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.container, { paddingHorizontal: spacing.base }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={{ flex: 1, backgroundColor: colors.bg0 }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Logo / Brand */}
-        <Animated.View entering={FadeInDown.delay(50).duration(600)} style={styles.brand}>
-          <View style={[styles.logoMark, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="flash" size={36} color={colors.accent} />
-          </View>
-          <Text style={[textStyles.headingLg, { color: colors.textPrimary, marginTop: spacing.base }]}>
-            Welcome back
-          </Text>
-          <Text style={[textStyles.bodyMd, { color: colors.textSecondary, marginTop: spacing.xs }]}>
-            Sign in to your Astra workspace
-          </Text>
-        </Animated.View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {/* Header Image Section */}
+          <Animated.View entering={FadeIn.duration(800)} style={styles.imageContainer}>
+            <Image 
+              source={require('../../assets/app-logo.jpeg')} 
+              style={styles.headerImage}
+              resizeMode="cover"
+            />
+            {/* Gradient Overlay to fade into background */}
+            <View style={[styles.imageOverlay, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
+          </Animated.View>
 
-        {/* Form */}
-        <Animated.View entering={FadeInDown.delay(150).duration(600)} style={styles.form}>
-          {error && (
-            <View style={[styles.errorBanner, { backgroundColor: colors.errorSoft, borderColor: colors.error }]}>
-              <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
-              <Text style={[textStyles.bodySm, { color: colors.error, flex: 1 }]}>{error}</Text>
+          {/* Form Bottom Sheet Style */}
+          <View 
+            style={[styles.formContainer, { backgroundColor: colors.bg1, paddingBottom: Math.max(insets.bottom + spacing.xl, spacing['3xl']) }]}
+          >
+            {/* Header Text */}
+            <View style={styles.headerTextWrap}>
+              <Text style={[textStyles.headingLg, { color: colors.textPrimary, letterSpacing: -1, fontSize: 36 }]}>
+                Welcome
+              </Text>
+              <Text style={[textStyles.headingLg, { color: colors.accent, letterSpacing: -1, fontSize: 36, marginTop: -4 }]}>
+                Back
+              </Text>
+              <Text style={[textStyles.bodyLg, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+                Sign in to your Astra workspace
+              </Text>
             </View>
-          )}
 
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="Email"
-                placeholder="you@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.email?.message}
-                leftIcon={<Ionicons name="mail-outline" size={18} color={colors.textMuted} />}
-              />
+            {/* Error Banner */}
+            {error && (
+              <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorBanner, { backgroundColor: colors.errorSoft, borderColor: colors.error }]}>
+                <Ionicons name="alert-circle" size={20} color={colors.error} />
+                <Text style={[textStyles.bodySm, { color: colors.error, flex: 1, fontWeight: '500' }]}>{error}</Text>
+              </Animated.View>
             )}
-          />
 
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                ref={passwordRef}
-                label="Password"
-                placeholder="Enter your password"
-                secureTextEntry
-                autoComplete="password"
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit(onSubmit)}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.password?.message}
-                leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />}
-                containerStyle={{ marginTop: spacing.base }}
+            {/* Form Inputs */}
+            <View style={styles.inputGroup}>
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <Input
+                    label="Email"
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={errors.email?.message}
+                    leftIcon={<Ionicons name="mail" size={20} color={colors.textMuted} />}
+                  />
+                )}
               />
-            )}
-          />
 
-          <Button
-            label="Sign In"
-            onPress={handleSubmit(onSubmit)}
-            loading={isLoading}
-            fullWidth
-            size="lg"
-            style={{ marginTop: spacing.xl }}
-          />
-        </Animated.View>
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <Input
+                    ref={passwordRef}
+                    label="Password"
+                    placeholder="Enter your password"
+                    isPassword
+                    autoComplete="password"
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit(onSubmit)}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={errors.password?.message}
+                    leftIcon={<Ionicons name="lock-closed" size={20} color={colors.textMuted} />}
+                    containerStyle={{ marginTop: spacing.md }}
+                  />
+                )}
+              />
+            </View>
 
-        {/* Footer */}
-        <Animated.View entering={FadeInUp.delay(250).duration(600)} style={styles.footer}>
-          <Text style={[textStyles.bodyMd, { color: colors.textSecondary }]}>
-            Don't have an account?{' '}
-          </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={[textStyles.labelLg, { color: colors.accent }]}>Create one</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <TouchableOpacity 
+              style={styles.forgotPassword} 
+              onPress={() => router.push('/(auth)/forgot-password')}
+            >
+              <Text style={[textStyles.labelMd, { color: colors.textSecondary }]}>Forgot password?</Text>
+            </TouchableOpacity>
+
+            <Button
+              label="Sign In"
+              onPress={handleSubmit(onSubmit)}
+              loading={isLoading}
+              fullWidth
+              size="lg"
+              style={styles.actionBtn}
+            />
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text style={[textStyles.bodyMd, { color: colors.textSecondary }]}>
+                Don't have an account?{' '}
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/register')} activeOpacity={0.7}>
+                <Text style={[textStyles.labelLg, { color: colors.accent }]}>Create one</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: spacing['3xl'],
+  imageContainer: {
+    height: height * 0.45,
+    width: '100%',
+    position: 'relative',
   },
-  brand: {
-    alignItems: 'center',
-    marginBottom: spacing['3xl'],
+  headerImage: {
+    width: '100%',
+    height: '100%',
   },
-  logoMark: {
-    width: 80,
-    height: 80,
-    borderRadius: radii['2xl'],
-    alignItems: 'center',
-    justifyContent: 'center',
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
-  form: {
-    gap: 0,
+  formContainer: {
+    flex: 1,
+    marginTop: -40,
+    borderTopLeftRadius: radii['3xl'],
+    borderTopRightRadius: radii['3xl'],
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing['2xl'],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  headerTextWrap: {
+    marginBottom: spacing['2xl'],
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
-    borderRadius: radii.md,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    marginBottom: spacing.base,
+    marginBottom: spacing.lg,
+  },
+  inputGroup: {
+    gap: spacing.sm,
+  },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+    paddingVertical: spacing.xs,
+  },
+  actionBtn: {
+    marginTop: spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 6,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     marginTop: spacing['2xl'],
   },
 });

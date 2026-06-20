@@ -12,6 +12,11 @@ export interface Colors {
   bg1: string;
   bg2: string;
   bg3: string;
+  glass: string;
+  glassLight: string;
+  glassDark: string;
+  glassBorder: string;
+  glassSoft: string;
   border: string;
   borderLight: string;
   accent: string;

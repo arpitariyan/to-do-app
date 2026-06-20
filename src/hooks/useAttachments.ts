@@ -115,6 +115,16 @@ export function useAttachments() {
     }
   };
 
+  const deleteFile = async (fileId: string): Promise<boolean> => {
+    try {
+      await storage.deleteFile(STORAGE_BUCKETS.ATTACHMENTS, fileId);
+      return true;
+    } catch (error) {
+      console.error(`Error deleting file ${fileId} from storage:`, error);
+      return false;
+    }
+  };
+
   return {
     pickDocument,
     uploadFile,
@@ -122,6 +132,7 @@ export function useAttachments() {
     getFileDownloadUrl,
     getFileDetails,
     getLocalFileUri,
+    deleteFile,
     isUploading,
   };
 }

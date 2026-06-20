@@ -7,6 +7,13 @@ export const palette = {
   bg2: '#2C2C2E',
   bg3: '#3A3A3C',
 
+  // Glassmorphism (Neutral / iOS 17 style) - Less transparent
+  glass: 'rgba(28, 28, 30, 0.65)', // Blur background
+  glassLight: 'rgba(255, 255, 255, 0.12)', // Surface highlights
+  glassDark: 'rgba(0, 0, 0, 0.7)', // Deep shadow areas
+  glassBorder: 'rgba(255, 255, 255, 0.18)', // Hairline borders
+  glassSoft: 'rgba(255, 255, 255, 0.06)', // Extremely subtle cards
+
   // Borders
   border: '#2C2C2E',
   borderLight: '#3A3A3C',
@@ -50,6 +57,14 @@ export const lightPalette = {
   bg1: '#FFFFFF', // Pure White Cards
   bg2: '#F4F4F5',
   bg3: '#E4E4E7',
+  
+  // Glassmorphism Light (Neutral / iOS 17 style)
+  glass: 'rgba(255, 255, 255, 0.85)',
+  glassLight: 'rgba(255, 255, 255, 0.95)',
+  glassDark: 'rgba(0, 0, 0, 0.08)',
+  glassBorder: 'rgba(0, 0, 0, 0.15)',
+  glassSoft: 'rgba(255, 255, 255, 0.65)',
+
   border: '#F4F4F5',
   borderLight: '#E4E4E7',
   textPrimary: '#18181B', // Deep Charcoal
@@ -93,12 +108,12 @@ export const spacing = {
 // ─── Border Radii (ASTRA Specs) ───────────────────────────────────────────────
 
 export const radii = {
-  sm: 8,
-  md: 12,
-  lg: 16, // Buttons
-  xl: 24, // Cards / Dialogs
-  '2xl': 28, // Large Cards
-  '3xl': 32, // Bottom Sheets
+  sm: 10,
+  md: 14,
+  lg: 20, // Buttons
+  xl: 28, // Cards / Dialogs
+  '2xl': 32, // Large Cards
+  '3xl': 40, // Bottom Sheets
   full: 9999,
 } as const;
 
@@ -155,4 +170,4 @@ export const accentPresets = [
   { name: 'Coral', value: '#F43F5E' },
 ] as const;
 
-export type AccentColor = (typeof accentPresets)[number]['value'];
+export type AccentColor = string;

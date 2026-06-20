@@ -12,7 +12,8 @@ if (!PROJECT_ID) {
 export const client = new Client()
   .setEndpoint(ENDPOINT)
   .setProject(PROJECT_ID)
-  .setPlatform('com.personal.nexus');
+  .setPlatform('com.personal.nexus')
+  .setLocale('en');
 
 // ─── Services ─────────────────────────────────────────────────────────────────
 

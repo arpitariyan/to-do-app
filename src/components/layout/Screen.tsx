@@ -18,7 +18,7 @@ export function Screen({ children, style, noPadding = false, withBottomPad = fal
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.bg0 }]}>
+    <View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <SafeAreaView
         style={[
           styles.safe,
