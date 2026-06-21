@@ -100,7 +100,7 @@ function ConversationSidebar({
       <Animated.View style={[styles.drawer, drawerStyle]}>
         <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} experimentalBlurMethod="dimezisBlurView" />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.glassSoft }]} />
-        
+
         {/* Header */}
         <View style={[styles.drawerHeader, { paddingTop: insets.top + 12, borderBottomColor: colors.glassBorder }]}>
           <View style={styles.drawerHeaderLeft}>
@@ -463,48 +463,47 @@ export default function AIScreen() {
           <View style={styles.center}>
             <ActivityIndicator color={colors.accent} size="large" />
           </View>
+        ) : isEmptyChat ? (
+          <View style={styles.emptyContainer}>
+            {/* Hero Icon */}
+            <View style={[styles.heroIconWrap, { overflow: 'hidden', backgroundColor: '#000', borderWidth: 0, shadowColor: colors.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 10 }]}>
+              <Image source={require('../../assets/app-logo.jpeg')} style={{ width: '100%', height: '100%' }} />
+            </View>
+
+            <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
+              Hi, I'm Astra
+            </Text>
+            <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
+              I can manage your tasks and notes effortlessly.{'\n'}Try a suggestion or ask me anything.
+            </Text>
+
+            {/* Suggestion Grid */}
+            <View style={styles.suggestionsGrid}>
+              {SUGGESTIONS.map((s, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.suggCard}
+                  onPress={() => handleSuggestion(s.text)}
+                  activeOpacity={0.65}
+                >
+                  <GlassCard intensity={30} style={{ padding: 13, borderColor: colors.glassBorder }}>
+                    <View style={[styles.suggIconWrap, { backgroundColor: s.color + '22' }]}>
+                      <Ionicons name={s.icon as any} size={18} color={s.color} />
+                    </View>
+                    <Text style={[styles.suggText, { color: colors.textSecondary }]} numberOfLines={3}>
+                      {s.text}
+                    </Text>
+                  </GlassCard>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         ) : (
           <FlatList
             ref={flatListRef}
             data={messages}
             keyExtractor={(m) => m.$id}
-            contentContainerStyle={[styles.messageList, isEmptyChat && { flex: 1 }]}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                {/* Hero Icon */}
-                <View style={[styles.heroIconWrap, { overflow: 'hidden', backgroundColor: '#000', borderWidth: 0, shadowColor: colors.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 10 }]}>
-                  <Image source={require('../../assets/app-logo.jpeg')} style={{ width: '100%', height: '100%' }} />
-                </View>
-
-                <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-                  Hi, I'm Astra
-                </Text>
-                <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
-                  I can manage your tasks and notes effortlessly.{'\n'}Try a suggestion or ask me anything.
-                </Text>
-
-                {/* Suggestion Grid */}
-                <View style={styles.suggestionsGrid}>
-                  {SUGGESTIONS.map((s, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={styles.suggCard}
-                      onPress={() => handleSuggestion(s.text)}
-                      activeOpacity={0.65}
-                    >
-                      <GlassCard intensity={30} style={{ padding: 13, borderColor: colors.glassBorder }}>
-                        <View style={[styles.suggIconWrap, { backgroundColor: s.color + '22' }]}>
-                          <Ionicons name={s.icon as any} size={18} color={s.color} />
-                        </View>
-                        <Text style={[styles.suggText, { color: colors.textSecondary }]} numberOfLines={3}>
-                          {s.text}
-                        </Text>
-                      </GlassCard>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            }
+            contentContainerStyle={styles.messageList}
             renderItem={({ item }) => (
               <ChatBubble
                 message={item}
