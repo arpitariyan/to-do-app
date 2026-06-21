@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   View, TextInput, TouchableOpacity, StyleSheet,
-  Platform, ActivityIndicator,
+  Platform, ActivityIndicator, Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/src/theme/ThemeContext';
@@ -23,20 +23,20 @@ export function ChatInput({ value, onChangeText, onSend, isLoading, placeholder 
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg0 }]}>
-      {/* Top divider */}
-      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
       <View style={[
         styles.inputRow,
         {
           backgroundColor: colors.bg1,
-          borderColor: isFocused ? colors.accent : colors.borderLight,
+          borderColor: isFocused ? colors.accent : colors.glassBorder,
           shadowColor: colors.accent,
+          shadowOpacity: isFocused ? 0.2 : 0.05,
+          shadowRadius: isFocused ? 12 : 5,
+          elevation: isFocused ? 6 : 2,
         }
       ]}>
-        {/* Sparkles prefix icon */}
-        <View style={[styles.prefixIcon, { backgroundColor: colors.accentSoft }]}>
-          <Ionicons name="sparkles" size={14} color={colors.accent} />
+        {/* App Logo prefix */}
+        <View style={styles.prefixIcon}>
+          <Image source={require('../../../assets/app-logo.jpeg')} style={styles.prefixImage} />
         </View>
 
         <TextInput
@@ -44,7 +44,7 @@ export function ChatInput({ value, onChangeText, onSend, isLoading, placeholder 
           style={[styles.input, { color: colors.textPrimary }]}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder ?? 'Ask AI anything…'}
+          placeholder={placeholder ?? 'Message Astra…'}
           placeholderTextColor={colors.textMuted}
           multiline
           maxLength={1000}
@@ -61,7 +61,6 @@ export function ChatInput({ value, onChangeText, onSend, isLoading, placeholder 
             styles.sendBtn,
             {
               backgroundColor: canSend ? colors.accent : colors.bg3,
-              opacity: canSend ? 1 : 0.5,
             }
           ]}
           onPress={onSend}
@@ -73,7 +72,7 @@ export function ChatInput({ value, onChangeText, onSend, isLoading, placeholder 
           ) : (
             <Ionicons
               name="arrow-up"
-              size={17}
+              size={18}
               color={canSend ? '#fff' : colors.textMuted}
             />
           )}
@@ -89,49 +88,46 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 100 : 90,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginBottom: 10,
-  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: radii.xl,
+    borderRadius: 24, // pill-shaped
     borderWidth: 1.5,
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingVertical: 8,
+    paddingLeft: 8,
+    paddingRight: 6,
+    paddingVertical: 6,
     gap: 8,
-    // Subtle glow when focused
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 4 },
   },
   prefixIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 3,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginBottom: 4,
     flexShrink: 0,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  prefixImage: {
+    width: '100%',
+    height: '100%',
   },
   input: {
     flex: 1,
-    minHeight: 36,
+    minHeight: 38,
     maxHeight: 130,
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 22,
-    paddingTop: Platform.OS === 'ios' ? 7 : 4,
-    paddingBottom: Platform.OS === 'ios' ? 3 : 2,
+    paddingTop: Platform.OS === 'ios' ? 8 : 6,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 6,
   },
   sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 1,
+    marginBottom: 2,
     flexShrink: 0,
   },
 });

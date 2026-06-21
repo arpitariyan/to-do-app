@@ -61,7 +61,7 @@ function AppNavigator() {
     } else if (isAuthenticated && isLocked && !isLockScreen) {
       router.replace('/lock');
     } else if (isAuthenticated && !isLocked && (inAuthGroup || isLockScreen)) {
-      router.replace('/(app)');
+      router.replace('/');
     }
   }, [isAuthenticated, authLoading, segments, isLocked]);
 

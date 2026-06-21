@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
   Clipboard, KeyboardAvoidingView, Platform,
-  ActivityIndicator, Dimensions, TextInput, ScrollView,
+  ActivityIndicator, Dimensions, TextInput, ScrollView, Image
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming,
@@ -104,8 +104,8 @@ function ConversationSidebar({
         {/* Header */}
         <View style={[styles.drawerHeader, { paddingTop: insets.top + 12, borderBottomColor: colors.glassBorder }]}>
           <View style={styles.drawerHeaderLeft}>
-            <View style={[styles.drawerLogo, { backgroundColor: colors.accentSoft }]}>
-              <Ionicons name="sparkles" size={16} color={colors.accent} />
+            <View style={[styles.drawerLogo, { overflow: 'hidden' }]}>
+              <Image source={require('../../assets/app-logo.jpeg')} style={{ width: '100%', height: '100%' }} />
             </View>
             <Text style={[styles.drawerTitle, { color: colors.textPrimary }]}>Conversations</Text>
           </View>
@@ -278,8 +278,10 @@ export default function AIScreen() {
       setActiveConv(conv);
       setMessages([]);
       historyRef.current = [];
+      return conv;
     } catch (e) {
       console.warn('Failed to create conversation:', e);
+      return null;
     }
   };
 
@@ -291,14 +293,10 @@ export default function AIScreen() {
 
     let conv = activeConv;
     if (!conv) {
-      await startNewConversation(text);
-      conv = null;
+      conv = await startNewConversation(text);
     }
 
-    if (!conv) {
-      setTimeout(() => handleSend(), 200);
-      return;
-    }
+    if (!conv) return;
 
     const userMsgData = await saveMessage({ conversationId: conv.$id, role: 'user', content: text }).catch(() => null);
     if (userMsgData) {
@@ -332,57 +330,15 @@ export default function AIScreen() {
     }
   }, [input, isTyping, activeConv]);
 
-  // ── Re-send when activeConv is set from a new conversation ────────────────
-  const pendingSendRef = useRef<string | null>(null);
-  const prevActiveConvRef = useRef<AIConversation | null>(null);
-  useEffect(() => {
-    if (activeConv && activeConv.$id !== prevActiveConvRef.current?.$id && pendingSendRef.current) {
-      prevActiveConvRef.current = activeConv;
-      const pending = pendingSendRef.current;
-      pendingSendRef.current = null;
-      (async () => {
-        const userMsgData = await saveMessage({ conversationId: activeConv.$id, role: 'user', content: pending }).catch(() => null);
-        if (userMsgData) {
-          setMessages((prev) => [...prev, userMsgData]);
-          historyRef.current.push({ role: 'user', content: pending });
-        }
-        setIsTyping(true);
-        try {
-          const result = await processMessage(pending, historyRef.current.slice(-12));
-          const aiMsgData = await saveMessage({
-            conversationId: activeConv.$id,
-            role: 'assistant',
-            content: result.reply,
-            actionType: result.intent,
-            actionResult: result.actionResult ? JSON.stringify(result.actionResult) : undefined,
-          }).catch(() => null);
-          if (aiMsgData) {
-            setMessages((prev) => [...prev, aiMsgData]);
-            historyRef.current.push({ role: 'assistant', content: result.reply });
-          }
-        } catch { }
-        setIsTyping(false);
-        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-      })();
-    }
-  }, [activeConv]);
-
   // ── Handle suggestion tap ──────────────────────────────────────────────────
   const handleSuggestion = async (text: string) => {
     setInput('');
     let conv = activeConv;
     if (!conv) {
-      const title = text.slice(0, 60);
-      conv = await createConversation(title).catch(() => null);
-      if (conv) {
-        setConversations((prev) => [conv!, ...prev]);
-        setActiveConv(conv);
-        setMessages([]);
-        historyRef.current = [];
-        pendingSendRef.current = text;
-      }
-      return;
+      conv = await startNewConversation(text);
     }
+    if (!conv) return;
+
     const userMsgData = await saveMessage({ conversationId: conv.$id, role: 'user', content: text }).catch(() => null);
     if (userMsgData) {
       setMessages((prev) => [...prev, userMsgData]);
@@ -474,16 +430,13 @@ export default function AIScreen() {
       {/* ── Header ── */}
       <View style={[styles.header, { borderBottomColor: colors.glassBorder, backgroundColor: 'transparent' }]}>
         <TouchableOpacity onPress={() => setSidebarOpen(true)} style={styles.headerBtn} activeOpacity={0.7}>
-          <Ionicons name="menu" size={24} color={colors.textPrimary} />
+          <Ionicons name="menu" size={26} color={colors.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
-          <View style={styles.headerTitleRow}>
-            <View style={styles.aiDot} />
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-              {activeConv?.title ?? 'AI Assistant'}
-            </Text>
-          </View>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+            {activeConv?.title ?? 'Astra Assistant'}
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -496,7 +449,7 @@ export default function AIScreen() {
           style={styles.headerBtn}
           activeOpacity={0.7}
         >
-          <Ionicons name="create-outline" size={22} color={colors.accent} />
+          <Ionicons name="create-outline" size={24} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -519,12 +472,12 @@ export default function AIScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 {/* Hero Icon */}
-                <View style={[styles.heroIconWrap, { backgroundColor: colors.accentSoft, borderWidth: 1, borderColor: colors.accentMid }]}>
-                  <Ionicons name="sparkles" size={30} color={colors.accent} />
+                <View style={[styles.heroIconWrap, { overflow: 'hidden', backgroundColor: '#000', borderWidth: 0, shadowColor: colors.accent, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 10 }]}>
+                  <Image source={require('../../assets/app-logo.jpeg')} style={{ width: '100%', height: '100%' }} />
                 </View>
 
                 <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-                  How can I help you?
+                  Hi, I'm Astra
                 </Text>
                 <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
                   I can manage your tasks and notes effortlessly.{'\n'}Try a suggestion or ask me anything.
@@ -759,15 +712,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  aiDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
-  headerTitle: { fontSize: 15, fontWeight: '700' },
+  headerBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 10 },
+  headerTitle: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   messageList: { paddingVertical: spacing.md },

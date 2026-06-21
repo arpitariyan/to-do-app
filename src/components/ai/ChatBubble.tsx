@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/src/theme/ThemeContext';
 import { spacing, radii } from '@/src/theme/tokens';
@@ -22,7 +22,7 @@ export function ChatBubble({ message, onDelete, onCopy }: ChatBubbleProps) {
 
   const bubbleBg = isUser
     ? colors.accent
-    : colors.bg1;
+    : colors.glassSoft; // AI bubble uses glass effect
 
   const textColor = isUser ? '#fff' : colors.textPrimary;
   const timeStr = new Date(message.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -31,8 +31,8 @@ export function ChatBubble({ message, onDelete, onCopy }: ChatBubbleProps) {
     <View style={[styles.wrapper, isUser ? styles.wrapperUser : styles.wrapperAI]}>
       {/* Avatar — only for AI */}
       {!isUser && (
-        <View style={[styles.avatar, { backgroundColor: colors.accent + '20' }]}>
-          <Ionicons name="sparkles" size={14} color={colors.accent} />
+        <View style={[styles.avatar, { shadowColor: colors.accent, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 }]}>
+          <Image source={require('../../../assets/app-logo.jpeg')} style={styles.avatarImage} />
         </View>
       )}
 
@@ -43,7 +43,8 @@ export function ChatBubble({ message, onDelete, onCopy }: ChatBubbleProps) {
             styles.bubble,
             { backgroundColor: bubbleBg },
             isUser ? styles.bubbleUser : styles.bubbleAI,
-            !isUser && { borderColor: colors.border, borderWidth: 1 },
+            !isUser && { borderColor: colors.borderLight, borderWidth: 1 },
+            isUser && { shadowColor: colors.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
           ]}
         >
           <Text style={[styles.text, { color: textColor }]}>
@@ -79,39 +80,43 @@ export function ChatBubble({ message, onDelete, onCopy }: ChatBubbleProps) {
 const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
-    marginVertical: 4,
+    marginVertical: 6,
     paddingHorizontal: spacing.md,
     alignItems: 'flex-end',
   },
   wrapperUser: { justifyContent: 'flex-end' },
   wrapperAI: { justifyContent: 'flex-start' },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
     marginBottom: 20,
+    backgroundColor: '#000',
+  },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   bubbleCol: { maxWidth: '78%' },
   bubbleColUser: { alignItems: 'flex-end' },
   bubbleColAI: { alignItems: 'flex-start' },
   bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
   },
   bubbleUser: { borderBottomRightRadius: 4 },
   bubbleAI: { borderBottomLeftRadius: 4 },
-  text: { fontSize: 14.5, lineHeight: 21 },
+  text: { fontSize: 15, lineHeight: 22 },
   meta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
-    paddingHorizontal: 2,
+    gap: 8,
+    marginTop: 4,
+    paddingHorizontal: 4,
   },
-  time: { fontSize: 10 },
+  time: { fontSize: 10, fontWeight: '500' },
   metaBtn: { padding: 2 },
 });

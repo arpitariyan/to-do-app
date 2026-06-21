@@ -17,10 +17,10 @@ export default function TasksScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const isDark = colors.bg1 !== '#FFFFFF';
-  
+
   const [filter, setFilter] = useState<FilterType>('today');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const { data: tasks = [], isLoading, error } = useTasks({ archived: false });
   const updateTask = useUpdateTask();
 
@@ -95,26 +95,26 @@ export default function TasksScreen() {
         {(['today', 'upcoming', 'completed'] as FilterType[]).map((tab) => {
           const isActive = filter === tab;
           return (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={tab}
               style={[
-                styles.tab, 
+                styles.tab,
                 isActive ? [
                   styles.tabActive,
-                  { 
+                  {
                     backgroundColor: colors.textPrimary,
                   }
                 ] : { backgroundColor: 'transparent' }
-              ]} 
+              ]}
               onPress={() => setFilter(tab)}
               activeOpacity={0.8}
             >
               <Text style={[
-                textStyles.body, 
-                { 
-                  color: isActive 
-                    ? colors.bg0 
-                    : colors.textSecondary, 
+                textStyles.body,
+                {
+                  color: isActive
+                    ? colors.bg0
+                    : colors.textSecondary,
                   fontFamily: isActive ? 'Inter_600SemiBold' : 'Inter_500Medium',
                   fontSize: 13,
                 }
@@ -138,10 +138,10 @@ export default function TasksScreen() {
       ) : filteredTasks.length === 0 ? (
         <Animated.View entering={FadeInDown} style={styles.center}>
           <View style={[styles.emptyIconBg, { backgroundColor: colors.glassSoft }]}>
-            <Ionicons 
-              name={filter === 'completed' ? "checkmark-done-circle-outline" : "calendar-clear-outline"} 
-              size={48} 
-              color={colors.textMuted} 
+            <Ionicons
+              name={filter === 'completed' ? "checkmark-done-circle-outline" : "calendar-clear-outline"}
+              size={48}
+              color={colors.textMuted}
             />
           </View>
           <Text style={[textStyles.sectionTitle, { color: colors.textPrimary, marginTop: spacing.lg }]}>
@@ -164,10 +164,10 @@ export default function TasksScreen() {
           removeClippedSubviews={true}
           renderItem={({ item, index }) => (
             <Animated.View entering={FadeInDown.delay(Math.min(index, 10) * 50).duration(400)}>
-              <TaskItem 
-                task={item} 
-                onToggle={handleToggleTask} 
-                onPress={handlePressTask} 
+              <TaskItem
+                task={item}
+                onToggle={handleToggleTask}
+                onPress={handlePressTask}
               />
             </Animated.View>
           )}
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 96,
+    bottom: 130,
     right: spacing.lg,
     width: 64,
     height: 64,

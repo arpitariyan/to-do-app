@@ -64,13 +64,13 @@ export default function DashboardScreen() {
     recentNotes,
   } = useMemo(() => {
     const activeTasks = tasks.filter(t => t.status !== 'done');
-    const doneToday = tasks.filter(t => 
+    const doneToday = tasks.filter(t =>
       t.status === 'done' && t.updatedAt && new Date(t.updatedAt) >= todayStart
     );
-    
+
     const today = activeTasks.filter(t => t.dueAt && new Date(t.dueAt) < tomorrowStart);
     const upcoming = activeTasks.filter(t => !t.dueAt || new Date(t.dueAt) >= tomorrowStart);
-    
+
     return {
       todayTasks: today,
       upcomingTasks: upcoming,
@@ -80,9 +80,9 @@ export default function DashboardScreen() {
   }, [tasks, notes]);
 
   const isLoading = isLoadingTasks || isLoadingNotes;
-  
-  const completionRate = todayTasks.length + completedToday.length === 0 
-    ? 0 
+
+  const completionRate = todayTasks.length + completedToday.length === 0
+    ? 0
     : Math.round((completedToday.length / (todayTasks.length + completedToday.length)) * 100);
 
   const aiInsight = useMemo(() => {
@@ -116,7 +116,7 @@ export default function DashboardScreen() {
         {/* 1. Greeting Header */}
         <Animated.View entering={FadeInDown.delay(0).duration(500)} style={styles.header}>
           <View style={styles.headerText}>
-            <Text 
+            <Text
               style={[textStyles.screenTitle, { color: colors.textPrimary, fontSize: 36, lineHeight: 44, fontWeight: '800' }]}
               numberOfLines={3}
             >
@@ -130,7 +130,7 @@ export default function DashboardScreen() {
           <View style={styles.avatarStackWrapper}>
             <AvatarStack size={48} max={4} />
           </View>
-          
+
           <GlassCard style={styles.statsBadge} intensity={40}>
             <View style={[styles.statsDot, { backgroundColor: colors.success }]} />
             <Text style={[textStyles.bodySm, { color: colors.textPrimary, fontWeight: '600' }]}>
@@ -171,7 +171,7 @@ export default function DashboardScreen() {
                   </View>
                 )}
               </View>
-              
+
               <View style={styles.focusList}>
                 {todayTasks.length > 0 ? (
                   <>
@@ -222,27 +222,27 @@ export default function DashboardScreen() {
                     const darkColors = ['rgba(76,29,149,0.4)', 'rgba(6,78,59,0.4)', 'rgba(12,74,110,0.4)', 'rgba(124,45,18,0.4)'];
                     const bg = colors.bg1 === '#FFFFFF' ? pastelColors[index % 4] : darkColors[index % 4];
                     const textColor = colors.textPrimary;
-                    
+
                     return (
                       <TouchableOpacity
-                         key={note.$id}
-                         activeOpacity={0.8}
-                         onPress={() => handlePressNote(note.$id)}
-                       >
-                         <GlassCard style={[styles.noteCard, { backgroundColor: bg }]} intensity={30}>
-                           <Text style={[textStyles.cardTitle, { color: textColor }]} numberOfLines={2}>
-                             {note.title || 'Untitled'}
-                           </Text>
-                           <Text style={[textStyles.caption, { color: textColor, opacity: 0.7, marginTop: spacing.sm }]} numberOfLines={3}>
-                             {note.content ? note.content.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : 'Empty note...'}
-                           </Text>
-                         </GlassCard>
-                       </TouchableOpacity>
-                     );
-                   })}
-                 </ScrollView>
-               </Animated.View>
-             )}
+                        key={note.$id}
+                        activeOpacity={0.8}
+                        onPress={() => handlePressNote(note.$id)}
+                      >
+                        <GlassCard style={[styles.noteCard, { backgroundColor: bg }]} intensity={30}>
+                          <Text style={[textStyles.cardTitle, { color: textColor }]} numberOfLines={2}>
+                            {note.title || 'Untitled'}
+                          </Text>
+                          <Text style={[textStyles.caption, { color: textColor, opacity: 0.7, marginTop: spacing.sm }]} numberOfLines={3}>
+                            {note.content ? note.content.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : 'Empty note...'}
+                          </Text>
+                        </GlassCard>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </Animated.View>
+            )}
 
             {/* 6. Smart Assistant Insight */}
             <Animated.View entering={FadeInDown.delay(500).duration(500)} style={[styles.section, { marginBottom: spacing['3xl'] }]}>
@@ -252,8 +252,8 @@ export default function DashboardScreen() {
                   <Text style={[textStyles.sectionTitle, { color: colors.textPrimary }]}>AI Insight</Text>
                 </View>
               </View>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => router.push('/(app)/ai')}
               >
@@ -263,16 +263,16 @@ export default function DashboardScreen() {
                   tint={colors.bg1 === '#FFFFFF' ? 'light' : 'dark'}
                 >
                   <View style={styles.aiInsightHeader}>
-                     <View style={[styles.aiIconWrapper, { backgroundColor: colors.accent }]}>
-                       <Ionicons name="planet" size={24} color="#FFF" />
-                     </View>
-                     <Text style={[textStyles.headingSm, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
-                       {aiInsight.title}
-                     </Text>
-                     <Ionicons name="arrow-forward" size={20} color={colors.accent} />
+                    <View style={[styles.aiIconWrapper, { backgroundColor: colors.accent }]}>
+                      <Ionicons name="planet" size={24} color="#FFF" />
+                    </View>
+                    <Text style={[textStyles.headingSm, { color: colors.textPrimary, flex: 1, marginLeft: spacing.md }]}>
+                      {aiInsight.title}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={20} color={colors.accent} />
                   </View>
                   <Text style={[textStyles.bodyMd, { color: colors.textSecondary, marginTop: spacing.md, lineHeight: 22 }]}>
-                     {aiInsight.message}
+                    {aiInsight.message}
                   </Text>
                 </GlassCard>
               </TouchableOpacity>
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    bottom: 96,
+    bottom: 130,
     right: spacing.lg,
     width: 64,
     height: 64,
